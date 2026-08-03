@@ -1,0 +1,3 @@
+# Database security
+
+Keep URLs in a secret manager, rotate application/migration credentials independently, require verified TLS, restrict network ingress, encrypt disks/backups, and prohibit connection-string logging. Runtime and migration roles are distinct and least privilege. Queries are parameterized; transaction-local actor context supports RLS while application authorization remains primary. Public handlers return generic failures and no production stack traces. Liveness must only prove the process; readiness performs a bounded `SELECT 1`. Audit metadata excludes tokens, passwords and unnecessary health content and is mutation-protected. Annual and change-triggered cybersecurity/privacy reviews, access recertification and penetration testing remain required.

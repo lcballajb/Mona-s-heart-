@@ -1,0 +1,3 @@
+# Data export
+
+An authenticated request creates an owner-scoped `export_requests` row, a durable job and audit event atomically. The future worker will serialize documented JSON containing account contact fields, profile, user-authored health entries, consent history, organization memberships and user content. It excludes password/token hashes, MFA material, session/device security metadata, internal risk signals, unrelated organization/user records and third-party message content. Archives belong in encrypted object storage—not PostgreSQL—with authorized short-lived downloads and a 24-hour prototype expiry. Cleanup deletes expired objects and marks metadata expired. The development storage mock is fictional-only and not production-ready.

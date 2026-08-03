@@ -1,0 +1,3 @@
+# Background jobs
+
+The durable queue records type, opaque payload reference, status, attempts, schedule/lock/completion times, sanitized failure reason and dead-letter state. Supported types are data export, account deletion, email delivery, malware scanning, document processing, import synchronization, retention cleanup and audit archival. Payloads reference database records or object IDs and must never contain document bodies or raw health content. A future worker must claim rows with `FOR UPDATE SKIP LOCKED`, bound retries, renew locks, audit outcomes and expose content-free queue-depth/error metrics. No production worker or vendor integration is claimed here.

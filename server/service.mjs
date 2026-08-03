@@ -2,7 +2,6 @@ import {
   hashPassword,
   verifyPassword,
   opaqueToken,
-  tokenDigest,
   PUBLIC_ROLES,
   PRIVILEGED_ROLES,
   canViewHealth,
@@ -10,12 +9,17 @@ import {
 } from "./security.mjs";
 
 const SESSION_MS = 30 * 60 * 1000;
+const TOKEN_MS = 60 * 60 * 1000;
 export class MonaService {
-  constructor(store) {
+  constructor(store, emailProvider = null) {
     this.store = store;
+    this.emailProvider = emailProvider;
   }
   async register({ email, password, role = "patient" }) {
-    if (!/^\S+@\S+\.\S+$/.test(email) || this.store.findUserByEmail(email))
+    if (
+      !/^\S+@\S+\.\S+$/.test(email) ||
+      (await this.store.findUserByEmail(email))
+    )
       throw Object.assign(new Error("Registration unavailable"), {
         statusCode: 400,
       });
@@ -23,30 +27,40 @@ export class MonaService {
       throw Object.assign(new Error("Privileged roles require approval"), {
         statusCode: 403,
       });
-    const user = this.store.createUser({
+    const user = await this.store.createUser({
       email,
       passwordHash: await hashPassword(password),
+      passwordAlgorithm: "scrypt-v1",
       roles: [role],
     });
-    const verificationToken = opaqueToken(); // Deliver through a transactional email provider; only its digest belongs in PostgreSQL.
-    user.verificationDigest = tokenDigest(verificationToken);
+    const verificationToken = opaqueToken();
+    await this.store.createAccountToken(
+      user.id,
+      "email_verification",
+      verificationToken,
+      TOKEN_MS,
+    );
+    await this.emailProvider?.sendVerification({
+      to: user.email,
+      token: verificationToken,
+    });
     return { userId: user.id, verificationToken };
   }
-  verifyEmail(token) {
-    const user = [...this.store.users.values()].find(
-      (entry) => entry.verificationDigest === tokenDigest(token ?? ""),
+  async verifyEmail(token) {
+    const id = await this.store.consumeAccountToken(
+      "email_verification",
+      token ?? "",
     );
-    if (!user)
+    if (!id)
       throw Object.assign(new Error("Invalid or expired verification token"), {
         statusCode: 400,
       });
-    user.verifiedAt = this.store.now();
-    user.status = "active";
-    delete user.verificationDigest;
+    const user = await this.store.verifyUser(id);
+    await this.store.audit("email_verification", id, id);
     return user;
   }
   async signIn({ email, password }) {
-    const user = this.store.findUserByEmail(email);
+    const user = await this.store.findUserByEmail(email);
     const now = this.store.clock().getTime();
     if (
       !user ||
@@ -54,9 +68,10 @@ export class MonaService {
       !(await verifyPassword(password, user.passwordHash))
     ) {
       if (user) {
-        user.failedAttempts += 1;
-        if (user.failedAttempts >= 5)
-          user.lockedUntil = new Date(now + 15 * 60_000).toISOString();
+        await this.store.recordLoginFailure(user.id);
+        await this.store.audit("failed_login", user.id, user.id, {
+          result: "failure",
+        });
       }
       throw Object.assign(new Error("Invalid credentials"), {
         statusCode: 401,
@@ -66,142 +81,117 @@ export class MonaService {
       throw Object.assign(new Error("Account unavailable"), {
         statusCode: 403,
       });
-    user.failedAttempts = 0;
-    user.lockedUntil = null;
+    await this.store.clearLoginFailures(user.id);
     const token = opaqueToken();
-    const session = this.store.createSession(user.id, token, SESSION_MS);
-    this.store.audit("login", user.id, user.id);
+    const session = await this.store.createSession(user.id, token, SESSION_MS);
+    await this.store.audit("login", user.id, user.id);
     return {
       token,
       csrfToken: session.csrfToken,
       expiresAt: session.expiresAt,
     };
   }
-  signOut(token) {
-    const session = this.store.session(token);
-    if (session) session.revokedAt = this.store.now();
+  async signOut(token) {
+    const session = await this.store.session(token);
+    if (session) {
+      await this.store.revokeSession(token);
+      await this.store.audit("logout", session.userId, session.userId);
+    }
   }
-  actor(token) {
-    const session = this.store.session(token);
-    return session ? this.store.users.get(session.userId) : null;
+  async actor(token) {
+    const session = await this.store.session(token);
+    return session ? this.store.findUserById(session.userId) : null;
   }
-  approveRole(actor, userId, role, reason) {
+  async approveRole(actor, userId, role, reason) {
     requireAnyRole(actor, ["administrator"]);
     if (!PRIVILEGED_ROLES.has(role) || !reason)
       throw new Error("Invalid role approval");
-    const user = this.store.users.get(userId);
-    if (!user) throw new Error("User not found");
-    this.store.roleApprovals.push({
-      userId,
-      role,
-      approvedBy: actor.id,
-      reason,
-      approvedAt: this.store.now(),
-    });
-    if (!user.roles.includes(role)) user.roles.push(role);
-    this.store.audit("role_change", actor.id, userId, { role });
+    if (!(await this.store.findUserById(userId)))
+      throw new Error("User not found");
+    return this.store.approveRole(actor.id, userId, role, reason);
   }
-  viewHealth(actor, ownerId, field) {
-    const allowed = canViewHealth({
-      actor,
-      ownerId,
-      visibility: field.visibility,
-      connected: field.connected,
-      matchedMentor: field.matchedMentor,
-      authorizedOrganization: field.authorizedOrganization,
-    });
-    if (!allowed)
+  async viewHealth(actor, ownerId, field) {
+    if (
+      !canViewHealth({
+        actor,
+        ownerId,
+        visibility: field.visibility,
+        connected: field.connected,
+        matchedMentor: field.matchedMentor,
+        authorizedOrganization: field.authorizedOrganization,
+      })
+    )
       throw Object.assign(new Error("Forbidden"), { statusCode: 403 });
-    this.store.audit("profile_access", actor.id, ownerId, {
+    await this.store.audit("health_data_read", actor.id, ownerId, {
       fieldType: field.type,
     });
     return field.value;
   }
-  readMessage(actor, message) {
+  async readMessage(actor, message) {
     if (![message.senderId, message.recipientId].includes(actor.id))
       throw Object.assign(new Error("Forbidden"), { statusCode: 403 });
     return message;
   }
-  readDocument(actor, document) {
+  async readDocument(actor, document) {
     if (document.ownerId !== actor.id)
       throw Object.assign(new Error("Forbidden"), { statusCode: 403 });
-    this.store.audit("document_access", actor.id, document.ownerId);
+    await this.store.audit("document_access", actor.id, document.ownerId);
     return document;
   }
-  organizationData(actor, organizationId) {
-    if (
-      !this.store.memberships.some(
-        (m) =>
-          m.userId === actor.id &&
-          m.organizationId === organizationId &&
-          m.status === "active",
-      )
-    )
+  async organizationData(actor, organizationId) {
+    if (!(await this.store.hasMembership(actor.id, organizationId)))
       throw Object.assign(new Error("Forbidden"), { statusCode: 403 });
-    this.store.audit("organization_access", actor.id, actor.id, {
+    await this.store.audit("organization_access", actor.id, actor.id, {
       organizationId,
     });
     return { organizationId };
   }
-  recordConsent(actor, purpose, version) {
-    const row = {
+  async recordConsent(actor, purpose, version, details = {}) {
+    const row = await this.store.recordConsent({
       userId: actor.id,
       purpose,
       version,
-      grantedAt: this.store.now(),
+      granted: true,
       withdrawnAt: null,
-    };
-    this.store.consents.push(row);
-    this.store.audit("consent_change", actor.id, actor.id, {
+      sourceInterface: details.sourceInterface ?? "web",
+      region: details.region ?? "unspecified",
+      language: details.language ?? "en",
+      organizationId: details.organizationId ?? null,
+    });
+    await this.store.audit("consent_change", actor.id, actor.id, {
       purpose,
       action: "grant",
     });
     return row;
   }
-  withdrawConsent(actor, purpose) {
-    const row = [...this.store.consents]
-      .reverse()
-      .find(
-        (c) => c.userId === actor.id && c.purpose === purpose && !c.withdrawnAt,
-      );
-    if (!row) throw new Error("Active consent not found");
-    row.withdrawnAt = this.store.now();
-    this.store.audit("consent_change", actor.id, actor.id, {
+  async withdrawConsent(actor, purpose, version = "current", details = {}) {
+    const row = await this.store.recordConsent({
+      userId: actor.id,
+      purpose,
+      version,
+      granted: false,
+      withdrawnAt: this.store.now(),
+      sourceInterface: details.sourceInterface ?? "web",
+      region: details.region ?? "unspecified",
+      language: details.language ?? "en",
+      organizationId: details.organizationId ?? null,
+    });
+    await this.store.audit("consent_change", actor.id, actor.id, {
       purpose,
       action: "withdraw",
     });
     return row;
   }
-  exportData(actor) {
-    this.store.audit("data_export", actor.id, actor.id);
-    return {
-      user: { id: actor.id, email: actor.email, roles: actor.roles },
-      consents: this.store.consents.filter((c) => c.userId === actor.id),
-      profile: this.store.profiles.get(actor.id) ?? null,
-    };
+  async exportData(actor) {
+    return this.store.createExportRequest(actor.id);
   }
-  deleteAccount(actor) {
-    actor.status = "deletion_pending";
-    actor.email = `deleted-${actor.id}@invalid.local`;
-    actor.passwordHash = "!";
-    for (const session of this.store.sessions.values())
-      if (session.userId === actor.id) session.revokedAt = this.store.now();
-    this.store.audit("data_deletion", actor.id, actor.id);
+  async deleteAccount(actor) {
+    return this.store.createDeletionRequest(actor.id);
   }
-  block(actor, blockedId) {
-    const row = { blockerId: actor.id, blockedId, createdAt: this.store.now() };
-    this.store.blocks.push(row);
-    return row;
+  async block(actor, blockedId) {
+    return this.store.createBlock(actor.id, blockedId);
   }
-  report(actor, subjectId, reason) {
-    const row = {
-      reporterId: actor.id,
-      subjectId,
-      reason,
-      status: "open",
-      createdAt: this.store.now(),
-    };
-    this.store.reports.push(row);
-    return row;
+  async report(actor, subjectId, reason) {
+    return this.store.createReport(actor.id, subjectId, reason);
   }
 }

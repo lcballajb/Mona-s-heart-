@@ -50,3 +50,7 @@ There is no backend, production identity, real authorization, persistence, EHR c
 ## Secure backend foundation
 
 The production direction is a separate Node/PostgreSQL API; see [ADR-002](docs/architecture/ADR-002-production-backend.md), the [security controls](docs/security/PRODUCTION_CONTROLS.md), and the normalized [migration](db/migrations/001_secure_foundation.sql). The checked-in API repository is useful for security-domain tests but its in-memory adapter is not production persistence. Health features remain demonstration-only and disabled pending professional reviews. Mona's Heart is owned by Prominent Life Investments; no HIPAA compliance claim is made.
+
+## Backend persistence
+
+The backend now supports dependency-injected `memory` and `postgres` adapters. Memory is intended only for local demos/tests. Production must set `DATABASE_ADAPTER=postgres`, a secret `DATABASE_URL`, verified TLS, and the pool/timeout settings described in [PostgreSQL setup](docs/backend/POSTGRESQL_SETUP.md); startup fails rather than falling back. Apply `npm run db:migrate` and the idempotent fictional seed with `npm run db:seed`. PostgreSQL integration tests use only `TEST_DATABASE_URL` via `npm run test:postgres`. See [ADR-004](docs/architecture/ADR-004-postgresql-persistence.md) and the operations runbook. Email delivery, production object storage, malware scanning, workers/monitoring, and final privacy, cybersecurity and legal approvals remain outstanding.

@@ -1,0 +1,3 @@
+# Database runbook
+
+Monitor pool total/idle/waiting, connection wait, aggregate query latency/error rate, rollback count, current migration and job depth—never labels, medication, diagnosis, document or message content. On readiness failure: stop traffic, verify provider/TLS/DNS/secret status without printing the URL, inspect saturation and recent migrations, and escalate. On migration failure: preserve logs, do not edit history or retry destructive SQL, identify the rolled-back file, fix forward and obtain review. On queue growth: pause producers if needed, inspect sanitized failure classes, recover stale locks and dead-letter only under procedure. Restore follows `BACKUP_AND_RESTORE.md`; record an incident and append auditable administrative actions.

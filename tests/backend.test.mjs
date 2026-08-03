@@ -10,7 +10,7 @@ async function active(service, store, email, role = "patient") {
     password: "correct horse battery staple",
     role,
   });
-  service.verifyEmail(registration.verificationToken);
+  await service.verifyEmail(registration.verificationToken);
   return store.users.get(registration.userId);
 }
 async function fixture() {
@@ -40,21 +40,21 @@ test("registration hashes passwords, verification gates authentication, sessions
     }),
     /unavailable/,
   );
-  service.verifyEmail(registration.verificationToken);
+  await service.verifyEmail(registration.verificationToken);
   const login = await service.signIn({
     email: user.email,
     password: "correct horse battery staple",
   });
-  assert.equal(service.actor(login.token).id, user.id);
+  assert.equal((await service.actor(login.token)).id, user.id);
   assert.equal(store.audits.at(-1).type, "login");
-  service.signOut(login.token);
-  assert.equal(service.actor(login.token), null);
+  await service.signOut(login.token);
+  assert.equal(await service.actor(login.token), null);
   const second = await service.signIn({
     email: user.email,
     password: "correct horse battery staple",
   });
   time = new Date("2026-01-01T00:31:00Z");
-  assert.equal(service.actor(second.token), null);
+  assert.equal(await service.actor(second.token), null);
 });
 
 test("abuse protection locks an account and privileged roles cannot be self-assigned", async () => {
@@ -94,7 +94,7 @@ test("administrator approval is required and patient is denied admin, moderation
     () => requireAnyRole(patient, ["content_reviewer", "medical_reviewer"]),
     /Forbidden/,
   );
-  service.approveRole(
+  await service.approveRole(
     admin,
     patient.id,
     "peer_mentor",
@@ -109,7 +109,7 @@ test("cross-user health, messages, and documents are private by default", async 
   const { store, service } = await fixture();
   const alice = await active(service, store, "alice@example.test");
   const bob = await active(service, store, "bob@example.test");
-  assert.throws(
+  await assert.rejects(
     () =>
       service.viewHealth(bob, alice.id, {
         type: "condition",
@@ -119,7 +119,7 @@ test("cross-user health, messages, and documents are private by default", async 
     /Forbidden/,
   );
   assert.equal(
-    service.viewHealth(bob, alice.id, {
+    await service.viewHealth(bob, alice.id, {
       type: "condition",
       value: "shared",
       visibility: "approved_connections",
@@ -127,7 +127,7 @@ test("cross-user health, messages, and documents are private by default", async 
     }),
     "shared",
   );
-  assert.throws(
+  await assert.rejects(
     () =>
       service.viewHealth(alice, alice.id, {
         type: "condition",
@@ -136,7 +136,7 @@ test("cross-user health, messages, and documents are private by default", async 
       }),
     /Forbidden/,
   );
-  assert.throws(
+  await assert.rejects(
     () =>
       service.readMessage(bob, {
         senderId: alice.id,
@@ -145,12 +145,15 @@ test("cross-user health, messages, and documents are private by default", async 
       }),
     /Forbidden/,
   );
-  assert.throws(
+  await assert.rejects(
     () =>
       service.readDocument(bob, { ownerId: alice.id, storageKey: "opaque" }),
     /Forbidden/,
   );
-  service.readDocument(alice, { ownerId: alice.id, storageKey: "opaque" });
+  await service.readDocument(alice, {
+    ownerId: alice.id,
+    storageKey: "opaque",
+  });
   assert.equal(store.audits.at(-1).type, "document_access");
 });
 
@@ -162,10 +165,10 @@ test("organization membership is isolated", async () => {
     organizationId: "hospital-a",
     status: "active",
   });
-  assert.deepEqual(service.organizationData(coordinator, "hospital-a"), {
+  assert.deepEqual(await service.organizationData(coordinator, "hospital-a"), {
     organizationId: "hospital-a",
   });
-  assert.throws(
+  await assert.rejects(
     () => service.organizationData(coordinator, "hospital-b"),
     /Forbidden/,
   );
@@ -175,10 +178,11 @@ test("organization membership is isolated", async () => {
 test("consent grant and withdrawal are timestamped and audited", async () => {
   const { store, service } = await fixture();
   const user = await active(service, store, "consent@example.test");
-  const consent = service.recordConsent(user, "peer_matching", "2026-01");
+  const consent = await service.recordConsent(user, "peer_matching", "2026-01");
   assert.equal(consent.withdrawnAt, null);
-  service.withdrawConsent(user, "peer_matching");
-  assert.ok(consent.withdrawnAt);
+  await service.withdrawConsent(user, "peer_matching");
+  assert.equal(consent.withdrawnAt, null);
+  assert.equal(store.consents.at(-1).granted, false);
   assert.deepEqual(
     store.audits.slice(-2).map((event) => event.metadata.action),
     ["grant", "withdraw"],
@@ -194,22 +198,23 @@ test("export is scoped and deletion deactivates credentials and sessions with au
     email: alice.email,
     password: "correct horse battery staple",
   });
-  const exported = service.exportData(alice);
-  assert.equal(exported.user.id, alice.id);
-  assert.notEqual(exported.user.id, bob.id);
-  assert.equal(store.audits.at(-1).type, "data_export");
-  service.deleteAccount(alice);
+  const exported = await service.exportData(alice);
+  assert.equal(exported.userId, alice.id);
+  assert.notEqual(exported.userId, bob.id);
+  assert.equal(store.jobs.at(-1).kind, "data_export");
+  assert.equal(store.audits.at(-1).type, "export_request");
+  await service.deleteAccount(alice);
   assert.equal(alice.status, "deletion_pending");
-  assert.equal(service.actor(login.token), null);
-  assert.equal(store.audits.at(-1).type, "data_deletion");
+  assert.equal(await service.actor(login.token), null);
+  assert.equal(store.audits.at(-1).type, "deletion_request");
 });
 
 test("blocks and reports preserve actor scope", async () => {
   const { store, service } = await fixture();
   const alice = await active(service, store, "reporter@example.test");
   const bob = await active(service, store, "reported@example.test");
-  service.block(alice, bob.id);
-  service.report(alice, bob.id, "harassment");
+  await service.block(alice, bob.id);
+  await service.report(alice, bob.id, "harassment");
   assert.deepEqual(store.blocks[0], {
     blockerId: alice.id,
     blockedId: bob.id,
