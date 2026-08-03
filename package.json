@@ -4,11 +4,12 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "lint": "eslint eslint.config.mjs tests/*.mjs && tsc -b",
+    "lint": "eslint eslint.config.mjs server/*.mjs tests/*.mjs && tsc -b",
     "lint:fix": "eslint eslint.config.mjs tests/*.mjs --fix && tsc -b",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,yml,css,html}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,yml,css,html}\"",
     "test": "node --test tests/*.test.mjs",
+    "start:api": "node server/index.mjs",
     "prepare": "node scripts/prepare.mjs"
   },
   "dependencies": {
