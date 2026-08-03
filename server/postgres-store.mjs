@@ -278,11 +278,16 @@ export class PostgresStore {
     });
   }
   async hasMembership(userId, organizationId) {
-    const { rows } = await this.query(
-      "SELECT 1 FROM organization_memberships WHERE user_id=$1 AND organization_id=$2 AND status='active'",
-      [userId, organizationId],
+    return this.transaction(
+      async (tx) => {
+        const { rows } = await tx.query(
+          "SELECT 1 FROM organization_memberships WHERE user_id=$1 AND organization_id=$2 AND status='active'",
+          [userId, organizationId],
+        );
+        return Boolean(rows[0]);
+      },
+      { organizationIds: [organizationId] },
     );
-    return Boolean(rows[0]);
   }
   async createBlock(blockerId, blockedId) {
     const { rows } = await this.query(
@@ -338,17 +343,22 @@ export class PostgresStore {
     return rows[0];
   }
   async addOrganizationMembership(input) {
-    const { rows } = await this.query(
-      `INSERT INTO organization_memberships(organization_id,user_id,role_code,status,approved_by) VALUES($1,$2,$3,$4,$5) RETURNING *`,
-      [
-        input.organizationId,
-        input.userId,
-        input.roleCode,
-        input.status ?? "pending",
-        input.approvedBy ?? null,
-      ],
+    return this.transaction(
+      async (tx) => {
+        const { rows } = await tx.query(
+          `INSERT INTO organization_memberships(organization_id,user_id,role_code,status,approved_by) VALUES($1,$2,$3,$4,$5) RETURNING *`,
+          [
+            input.organizationId,
+            input.userId,
+            input.roleCode,
+            input.status ?? "pending",
+            input.approvedBy ?? null,
+          ],
+        );
+        return rows[0];
+      },
+      { organizationIds: [input.organizationId] },
     );
-    return rows[0];
   }
   async createDocumentMetadata(ownerId, input) {
     const { rows } = await this.query(

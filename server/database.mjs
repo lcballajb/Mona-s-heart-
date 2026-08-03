@@ -6,6 +6,14 @@ export function poolConfig(env = process.env) {
   if (!env.DATABASE_URL)
     throw new Error("DATABASE_URL is required for PostgreSQL");
   const production = env.NODE_ENV === "production";
+  if (
+    production &&
+    (env.DATABASE_SSL !== "true" ||
+      env.DATABASE_SSL_REJECT_UNAUTHORIZED === "false")
+  )
+    throw new Error(
+      "Production PostgreSQL requires DATABASE_SSL=true with certificate verification enabled",
+    );
   return {
     connectionString: env.DATABASE_URL,
     max: Number(env.DATABASE_POOL_MAX ?? 10),
