@@ -23,7 +23,8 @@ Mona’s Heart is a healthcare support application developed and operated by Pro
 
 ## Development
 
-Requires Node.js 20+.
+Requires Node.js 24 LTS (see `.nvmrc` and `package.json`). npm is the only
+supported package manager; use the committed `package-lock.json`.
 
 ```bash
 npm ci
@@ -41,7 +42,12 @@ Major routes include `/`, `/signup`, `/onboarding`, `/dashboard`, `/health-profi
 
 `src/health` contains structured mock terminology; replace its search implementation with an authenticated, rate-limited server proxy before live terminology use. `src/ai` contains provider-neutral contracts, schemas, and guardrails. Client code must never import a provider secret. `src/features/flags.ts` defaults every high-risk capability off. See `docs/KNOWN_LIMITATIONS.md` before evaluation.
 
-There is no backend, production identity, real authorization, persistence, EHR connection, AI vendor, or approved clinical workflow. Front-end role affordances are demonstrations, not security controls. Do not use real patient or confidential data. No legal compliance, HIPAA compliance, FDA approval, clinical validation, hospital approval, trademark or copyright registration, or patent protection is claimed.
+The repository includes a security-focused Node API and PostgreSQL adapter, but
+it is not a deployed production identity service or an approved clinical
+workflow. There is no EHR connection or configured AI vendor. Front-end role
+affordances are demonstrations, not security controls. Do not use real patient
+or confidential data. No legal or HIPAA compliance, FDA approval, clinical
+validation, or hospital approval is claimed.
 
 ## Ownership
 

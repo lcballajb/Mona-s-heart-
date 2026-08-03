@@ -42,11 +42,14 @@ jobs:
       - run: npm run build
       - run: node scripts/backup.mjs --dry-run
       - run: node scripts/restore-check.mjs --dry-run
+      - name: Verify generated commands leave the checkout clean
+        run: git diff --exit-code && git diff --check
   dependency-review:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v5
       - uses: actions/dependency-review-action@v4
