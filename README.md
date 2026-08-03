@@ -1,4 +1,10 @@
-# Mona’s Heart
+# Mona's Heart
+
+Mona’s Heart is proprietary software owned by Prominent Life Investments.
+
+## Terminology services
+
+Medication autocomplete now uses the same-origin Node proxy for the official NLM RxNorm service when `RXNORM_PROXY_ENABLED=true`; it remains disabled by default and clearly labels fictional development fallback data. Diagnosis providers, ICD-10-CM, licensed SNOMED CT, LOINC/UCUM, official medication information, and reviewed educational associations use provenance-preserving abstractions and require production configuration and review. See [medication terminology](docs/medical/MEDICATION_TERMINOLOGY.md), [diagnosis terminology](docs/medical/DIAGNOSIS_TERMINOLOGY.md), and [the architecture decision](docs/architecture/ADR-003-terminology-services.md).
 
 Mona’s Heart is a healthcare support application developed and operated by Prominent Life Investments.
 
