@@ -1,0 +1,3 @@
+# Health search data
+
+Medication and diagnosis queries are sensitive. They are sent only to the same-origin terminology endpoint and its configured terminology upstream—not advertising, behavioral analytics, session replay, pixels, or marketing. Queries are not associated with user identity and raw text is not logged by default. Permitted aggregate operational metrics are latency, success rate, cache-hit rate, upstream failures, timeouts, and rate limits. Cache keys are one-way hashes, shared rather than user-specific, bounded, and short-lived; memory access and metric dimensions must be restricted to avoid reconstruction.

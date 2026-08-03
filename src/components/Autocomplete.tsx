@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import {
   searchDiagnoses,
   searchMedications,
+  searchMedicationFallback,
   type DiagnosisTerm,
   type MedicationTerm,
 } from "../health/terminology";
@@ -20,8 +21,12 @@ export function MedicationAutocomplete({
     [results, setResults] = useState<MedicationTerm[]>([]),
     [active, setActive] = useState(-1),
     [loading, setLoading] = useState(false),
-    [open, setOpen] = useState(false);
+    [open, setOpen] = useState(false),
+    [error, setError] = useState<string | null>(null),
+    [fallback, setFallback] = useState(false),
+    [retry, setRetry] = useState(0);
   useEffect(() => {
+    const controller = new AbortController();
     window.clearTimeout(timer.current);
     setActive(-1);
     if (query.trim().length < 2) {
@@ -30,12 +35,30 @@ export function MedicationAutocomplete({
       return;
     }
     setLoading(true);
-    timer.current = window.setTimeout(() => {
-      setResults(searchMedications(query));
-      setLoading(false);
+    setError(null);
+    timer.current = window.setTimeout(async () => {
+      try {
+        const response = await searchMedications(query, controller.signal);
+        setResults(response.results);
+        setFallback(response.fallback);
+      } catch (reason) {
+        if (controller.signal.aborted) return;
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : "Medication terminology is unavailable.",
+        );
+        setResults(searchMedicationFallback(query));
+        setFallback(true);
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
     }, 250);
-    return () => window.clearTimeout(timer.current);
-  }, [query]);
+    return () => {
+      window.clearTimeout(timer.current);
+      controller.abort();
+    };
+  }, [query, retry]);
   const choose = (term: MedicationTerm) => {
     onSelect(term);
     setQuery(term.genericName);
@@ -90,10 +113,25 @@ export function MedicationAutocomplete({
         autoComplete="off"
       />
       <span className="sr-only" aria-live="polite">
-        {loading ? "Searching" : `${results.length} suggestions available`}
+        {loading
+          ? "Searching"
+          : (error ?? `${results.length} suggestions available`)}
       </span>
       {query.length > 0 && query.length < 2 && (
         <small>Enter at least 2 characters.</small>
+      )}
+      {error && (
+        <div role="alert">
+          <span>{error} Your text has been preserved. </span>
+          <button type="button" onClick={() => setRetry((value) => value + 1)}>
+            Retry
+          </button>
+        </div>
+      )}
+      {fallback && (
+        <p className="fieldnotice">
+          Fallback terminology data—verification may be limited.
+        </p>
       )}
       {showOptions && (
         <ul id={`${id}-list`} role="listbox">
@@ -115,6 +153,9 @@ export function MedicationAutocomplete({
                   {m.activeIngredient} · {m.strength} · {m.doseForm} · RxCUI{" "}
                   {m.rxcui}
                 </small>
+                {m.verificationStatus !== "verified" && (
+                  <small>Unverified entry</small>
+                )}
               </button>
             </li>
           ))}

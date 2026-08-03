@@ -1,11 +1,3 @@
-# Terminology Mapping
+# Terminology mapping
 
-> Draft—requires review by qualified legal, privacy, security, and healthcare professionals before production use.
-
-Medication concepts prefer RxNorm/RxCUI; conditions prefer SNOMED CT with region-specific ICD mapping; units use UCUM; languages use BCP 47. Preserve user wording, source system, version, retrieval date, unmapped status, and human corrections.
-
-## Ownership
-
-Mona’s Heart is a healthcare support application developed and operated by Prominent Life Investments.
-
-© 2026 Prominent Life Investments. Mona’s Heart and all associated software, designs, content, workflows, and documentation are proprietary. All rights reserved.
+Reusable records support RxNorm medication identifiers; diagnosis systems including ICD-10-CM, appropriately licensed SNOMED CT, user text, and FHIR imports; LOINC observations; UCUM units; FHIR value sets; versions; region; language; source; and review date. Codes are stored with their system/version rather than silently translated. No clinical interpretation or equivalence is inferred. Future country-specific lab and diagnosis providers must implement the same provenance fields and receive terminology review.
