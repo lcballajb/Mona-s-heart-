@@ -1,0 +1,3 @@
+# Email provider
+
+`EmailProvider` renders versioned HTML and text for verification, reset, security/account changes, exports, deletion, invitations, and consent notices. Subjects contain no health content. Tokens exist only in time-limited links, while persistence stores digests; delivery logs omit token and recipient. Development accepts fictional addresses, tests capture messages, and production requires an injected SES, SendGrid, Postmark, Mailgun, or ACS adapter. Resend and enumeration controls use the shared limiter. Webhooks must verify provider signatures, normalize bounce/complaint outcomes, audit them, and never echo payloads. Locale defaults to `en`, region to `global`; translations require review.

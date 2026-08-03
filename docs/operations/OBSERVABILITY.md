@@ -1,0 +1,3 @@
+# Observability
+
+JSON logs use request/correlation IDs and pseudonymous actor identifiers. Interfaces support metrics, traces, errors, and alerts with deployment-injected OpenTelemetry, Sentry, Datadog, Azure Monitor, CloudWatch, or Google Operations sinks. Measure requests/errors/latency, DB pool/query latency, jobs, email, uploads/scans, cache/rate limits, terminology health and export/deletion duration. Never record health terms/values, document/message text, AI prompts, tokens, passwords, secrets, connection strings or recipients. Alert on readiness, elevated errors, queue age/dead letters, scan failures, complaints, and backup/restore failures.

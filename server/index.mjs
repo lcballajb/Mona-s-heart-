@@ -2,9 +2,17 @@ import http from "node:http";
 import { createStore } from "./store-factory.mjs";
 import { MonaService } from "./service.mjs";
 import { RxNormProvider, TerminologyCache } from "./terminology.mjs";
+import { createEmailProvider } from "./email-provider.mjs";
+import { createRateLimiter, privacyKey } from "./rate-limit.mjs";
+import {
+  securityHeaders,
+  allowedOrigin,
+  clientAddress,
+} from "./http-security.mjs";
+import { HealthService } from "./health.mjs";
 
 const store = await createStore();
-const service = new MonaService(store);
+const email = createEmailProvider();
 const rxnorm = new RxNormProvider({
   enabled: process.env.RXNORM_PROXY_ENABLED === "true",
   timeoutMs: Number(process.env.RXNORM_TIMEOUT_MS ?? 3000),
@@ -13,12 +21,31 @@ const rxnorm = new RxNormProvider({
     negativeTtlMs: Number(process.env.RXNORM_NEGATIVE_CACHE_TTL_MS ?? 60_000),
   }),
 });
-const rateBuckets = new Map();
+const rateLimiter = createRateLimiter();
+const service = new MonaService(store, email, rateLimiter);
 const production = process.env.NODE_ENV === "production";
-if (production && (!process.env.DATABASE_URL || !process.env.SESSION_PEPPER))
+if (
+  production &&
+  (!process.env.DATABASE_URL ||
+    !process.env.SESSION_PEPPER ||
+    !process.env.CORS_ALLOWLIST ||
+    !process.env.TRUSTED_PROXIES)
+)
   throw new Error(
     "Production secrets and PostgreSQL configuration are required",
   );
+const corsAllowlist = (process.env.CORS_ALLOWLIST ?? "http://localhost:5173")
+  .split(",")
+  .filter(Boolean);
+const trustedProxies = (process.env.TRUSTED_PROXIES ?? "")
+  .split(",")
+  .filter(Boolean);
+const health = new HealthService({
+  store,
+  email,
+  terminology: rxnorm,
+  required: production ? ["database", "email"] : ["database"],
+});
 
 function cookies(request) {
   return Object.fromEntries(
@@ -43,8 +70,7 @@ function reply(response, status, payload, headers = {}) {
   response.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
-    "x-content-type-options": "nosniff",
-    "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+    ...securityHeaders({ production }),
     ...headers,
   });
   response.end(JSON.stringify(payload));
@@ -52,33 +78,36 @@ function reply(response, status, payload, headers = {}) {
 const server = http.createServer(async (request, response) => {
   try {
     const path = new URL(request.url, "http://localhost").pathname;
-    const rateKey = `${request.socket.remoteAddress}:${path}`;
-    const now = Date.now();
-    const bucket = rateBuckets.get(rateKey) ?? {
-      count: 0,
-      resetsAt: now + 60_000,
-    };
-    if (bucket.resetsAt <= now) {
-      bucket.count = 0;
-      bucket.resetsAt = now + 60_000;
-    }
-    bucket.count += 1;
-    rateBuckets.set(rateKey, bucket);
+    const origin = request.headers.origin;
+    if (!allowedOrigin(origin, corsAllowlist))
+      return reply(response, 403, { error: "Origin not allowed" });
     const limit =
       path === "/v1/auth/sign-in"
         ? 10
         : path === "/v1/terminology/medications"
           ? 30
           : 120;
-    if (bucket.count > limit)
+    const rate = await rateLimiter.consume(
+      privacyKey(path, clientAddress(request, { trustedProxies })),
+      { limit, windowMs: 60_000 },
+    );
+    if (!rate.allowed)
       return reply(
         response,
         429,
         { error: "Too many requests", code: "RATE_LIMITED" },
-        { "retry-after": String(Math.ceil((bucket.resetsAt - now) / 1000)) },
+        { "retry-after": String(Math.ceil(rate.retryAfterMs / 1000)) },
       );
     if (production && request.headers["x-forwarded-proto"] !== "https")
       return reply(response, 426, { error: "HTTPS required" });
+    if (request.method === "GET" && path === "/health/live")
+      return reply(response, 200, health.liveness());
+    if (request.method === "GET" && path === "/health/ready") {
+      const result = await health.readiness();
+      return reply(response, result.status === "ready" ? 200 : 503, result);
+    }
+    if (request.method === "GET" && path === "/health/dependencies")
+      return reply(response, 200, await health.details());
     if (request.method === "GET" && path === "/v1/terminology/health")
       return reply(response, 200, rxnorm.health());
     if (request.method === "GET" && path === "/v1/terminology/medications") {
@@ -97,6 +126,21 @@ const server = http.createServer(async (request, response) => {
         response,
         204,
         await service.verifyEmail((await body(request)).token),
+      );
+    if (request.method === "POST" && path === "/v1/auth/password-reset/request")
+      return reply(
+        response,
+        202,
+        await service.requestPasswordReset(await body(request)),
+      );
+    if (
+      request.method === "POST" &&
+      path === "/v1/auth/password-reset/complete"
+    )
+      return reply(
+        response,
+        200,
+        await service.resetPassword(await body(request)),
       );
     if (request.method === "POST" && path === "/v1/auth/sign-in") {
       const result = await service.signIn(await body(request));
@@ -131,7 +175,7 @@ const server = http.createServer(async (request, response) => {
         },
       );
     }
-    if (request.method === "GET" && path === "/v1/account/export")
+    if (request.method === "POST" && path === "/v1/account/export")
       return reply(response, 202, await service.exportData(actor));
     if (request.method === "DELETE" && path === "/v1/account") {
       await service.deleteAccount(actor);

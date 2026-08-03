@@ -1,0 +1,3 @@
+# Security headers and proxy controls
+
+The API sets restrictive CSP, HSTS in production, nosniff, no-referrer, permissions policy, frame denial and private/no-store caching. Cookies are HttpOnly, SameSite=Strict and Secure in production. State changes require CSRF and allowed Origin; production CORS is an explicit allowlist, never `*`. Only allowlisted proxy addresses influence client identity or HTTPS forwarding. Nginx bounds body size and connect/read timeouts; API JSON is 32 KiB. Compression is disabled at the supplied proxy to reduce cross-secret compression risk. TLS terminates at reviewed ingress; this is encryption in transit, not a claim of end-to-end encryption.

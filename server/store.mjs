@@ -126,6 +126,11 @@ export class MemoryStore {
     user.failedAttempts = 0;
     user.lockedUntil = null;
   }
+  updatePassword(id, passwordHash) {
+    const user = this.users.get(id);
+    user.passwordHash = passwordHash;
+    return user;
+  }
   revokeSession(rawToken) {
     const row = this.sessions.get(tokenDigest(rawToken));
     if (row) row.revokedAt = this.now();
@@ -171,9 +176,53 @@ export class MemoryStore {
       completedAt: null,
       failureReason: null,
       deadLettered: false,
+      correlationId: randomUUID(),
+      idempotencyKey: `${kind}:${payloadReference}`,
     };
     this.jobs.push(row);
     return row;
+  }
+  claimJobs({ limit = 1, leaseMs = 60_000 } = {}) {
+    const now = this.clock().getTime();
+    return this.jobs
+      .filter(
+        (job) =>
+          !job.deadLettered &&
+          !job.completedAt &&
+          Date.parse(job.scheduledAt) <= now &&
+          (job.status === "queued" ||
+            (job.status === "running" &&
+              Date.parse(job.lockedAt) + leaseMs <= now)),
+      )
+      .slice(0, limit)
+      .map((job) => {
+        job.status = "running";
+        job.lockedAt = this.now();
+        job.attempts += 1;
+        return job;
+      });
+  }
+  completeJob(id) {
+    const job = this.jobs.find((row) => row.id === id);
+    job.status = "completed";
+    job.completedAt = this.now();
+    job.failureReason = null;
+    return job;
+  }
+  failJob(id, reason, { maxAttempts = 5, backoffMs = 1000 } = {}) {
+    const job = this.jobs.find((row) => row.id === id);
+    job.failureReason = String(reason).slice(0, 500);
+    job.lockedAt = null;
+    if (job.attempts >= maxAttempts) {
+      job.status = "failed";
+      job.deadLettered = true;
+    } else {
+      job.status = "queued";
+      job.scheduledAt = new Date(
+        this.clock().getTime() + backoffMs * 2 ** (job.attempts - 1),
+      ).toISOString();
+    }
+    return job;
   }
   createExportRequest(userId) {
     const row = {
