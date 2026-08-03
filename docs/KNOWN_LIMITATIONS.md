@@ -1,0 +1,3 @@
+# Known Limitations
+
+This is a fictional-data, front-end prototype: there is no production authentication, server authorization, database, encryption-at-rest implementation, RxNorm proxy, EHR, AI provider, real-time transport, malware scanner, monitoring, backup, or clinical workflow. Mock terminology is incomplete. AI and every high-risk feature default off. Accessibility, legal, clinical, pharmacist, wellness, privacy, cybersecurity, internationalization, and hospital reviews remain required. Do not use real personal or health data. No legal compliance, HIPAA compliance, FDA approval, clinical validation, hospital approval, registration, or patent protection is claimed.
