@@ -1,75 +1,42 @@
 # Mona’s Heart
 
-**“You don’t have to face it alone.”**
+Mona’s Heart is a healthcare support application developed and operated by Prominent Life Investments.
 
-Mona’s Heart is a standalone, responsive peer-support prototype that connects patients, survivor mentors, and caregivers around similar diagnoses, symptoms, treatments, medications, procedures, languages, and communication preferences.
+> **Prototype only:** Use fictional data. Mona’s Heart provides peer support, educational information, and organizational tools. It does not provide medical advice, diagnosis, or treatment. If you may be experiencing a medical emergency, contact local emergency services immediately.
 
-> **Prototype safety notice:** This app uses fictional demo information only. It is not medical advice, is not an emergency service, and is not approved for storing real medical records or protected health information (PHI).
+## What this hardening prototype includes
 
-## Highlights
+- Keyboard-accessible, debounced medication autocomplete shaped for a future **server-side RxNorm proxy**, with RxCUI metadata, an unverified free-text path, explicit add confirmation, and private-by-default history.
+- Diagnosis autocomplete with terminology provenance, user experience labels, and diagnosis disclaimer.
+- Provider-neutral, server-only AI interfaces, validated grounded-output schema, medical red-team guardrails, feature flags, human review and governance documents. AI is disabled without configuration.
+- Deterministic explainable matching that uses confirmed factors and explicit privacy boundaries—never a hidden medical-risk score.
+- Complementary and Integrative Wellness education with medication-replacement and interaction warnings.
+- Draft security, privacy, accessibility, legal, hospital, HL7 FHIR/SMART, real-time communication, and incident-response architecture.
+- PWA manifest, icon, privacy-safe offline fallback, and service worker that does not cache authenticated pages, health records, or documents.
+- CI, tests, type checking, ESLint, Prettier, Git hooks, issue templates, Dependabot, and ownership files.
 
-- Warm, accessible landing experience and role-based onboarding
-- Local demo authentication and protected-style application workspace
-- Searchable patient-to-mentor matching with compatibility scores and detailed profiles
-- Demo messaging, notifications, video scheduling, and simulated call room
-- Mock document center, lab comparison, doctor-note comparison, medication record, and care timeline
-- Ten condition and caregiver community groups with fictional discussions
-- Privacy controls, reporting/blocking affordances, safety guidance, and emergency resources
-- Admin demo with user moderation, reports, content queues, and analytics
-- Responsive navigation and layouts for desktop, tablet, and mobile
+## Development
 
-## Technology
-
-- React 18
-- TypeScript
-- Vite
-- React Router
-- Lucide icons
-- Custom responsive CSS design system
-
-All application state and content are local demo data. No server or database is configured.
-
-## Install and run
-
-Requirements: Node.js 20+ and npm.
+Requires Node.js 20+.
 
 ```bash
-npm install
+npm ci
 npm run dev
-```
-
-Open the local address printed by Vite (normally `http://localhost:5173`). Choose **Enter with demo account** on the login page to explore the workspace.
-
-## Production build
-
-```bash
+npm run typecheck
+npm run lint
+npm test
 npm run build
-npm run preview
+npm run format:check
 ```
 
-The production files are written to `dist/`.
+Major routes include `/`, `/signup`, `/onboarding`, `/dashboard`, `/health-profile`, `/medications`, `/matches`, `/messages`, `/calls`, `/documents`, `/wellness`, `/medical`, `/ai`, `/hospital`, `/accessibility`, `/privacy`, and `/terms`.
 
-## Project structure
+## Architecture and boundaries
 
-```text
-src/
-  data.ts       Fictional mentors, conversations, groups, and documents
-  main.tsx      Routes, screens, shared components, and local interactions
-  styles.css    Brand tokens, layout, accessibility, and responsive styles
-```
+`src/health` contains structured mock terminology; replace its search implementation with an authenticated, rate-limited server proxy before live terminology use. `src/ai` contains provider-neutral contracts, schemas, and guardrails. Client code must never import a provider secret. `src/features/flags.ts` defaults every high-risk capability off. See `docs/KNOWN_LIMITATIONS.md` before evaluation.
 
-## Main routes
+There is no backend, production identity, real authorization, persistence, EHR connection, AI vendor, or approved clinical workflow. Front-end role affordances are demonstrations, not security controls. Do not use real patient or confidential data. No legal compliance, HIPAA compliance, FDA approval, clinical validation, hospital approval, trademark or copyright registration, or patent protection is claimed.
 
-Public routes include `/`, `/about`, `/signup`, `/login`, `/privacy`, `/terms`, `/safety`, and `/emergency`. The demo workspace includes `/dashboard`, `/matches`, `/messages`, `/calls`, `/documents`, `/labs`, `/notes`, `/medications`, `/timeline`, `/groups`, `/notifications`, `/settings`, and `/admin`.
+## Ownership
 
-## Privacy and limitations
-
-- Do **not** enter real names, medical records, identifying information, credentials, or PHI.
-- Authentication, uploads, messaging, notifications, and video are simulated prototype experiences.
-- Prototype messaging does not claim HIPAA compliance.
-- Lab and note tools organize demo information; they do not interpret it.
-- Mona’s Heart cannot respond to emergencies. Call 911 or your local emergency number immediately when emergency care may be needed.
-
-## Environment variables
-
-No environment variables are required. `.env.example` documents that default. A future production implementation must complete security, privacy, legal, accessibility, clinical-safety, infrastructure, and compliance reviews before handling any real user data.
+© 2026 Prominent Life Investments. Mona’s Heart and all associated software, designs, content, workflows, and documentation are proprietary. All rights reserved. See [LICENSE](LICENSE).

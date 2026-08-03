@@ -2,16 +2,23 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "lint": "eslint eslint.config.mjs tests/*.mjs && tsc -b",
+    "lint:fix": "eslint eslint.config.mjs tests/*.mjs --fix && tsc -b",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,yml,css,html}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,yml,css,html}\"",
+    "test": "node --test tests/*.test.mjs",
+    "prepare": "node scripts/prepare.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "4.3.4",
-    "vite": "6.0.5",
-    "typescript": "5.7.2",
+    "lucide-react": "0.468.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-router-dom": "7.1.1",
-    "lucide-react": "0.468.0"
+    "typescript": "5.7.2",
+    "vite": "6.0.5"
   },
   "devDependencies": {
     "@types/react": "18.3.18",
