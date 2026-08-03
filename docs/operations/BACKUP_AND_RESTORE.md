@@ -1,0 +1,3 @@
+# Backup and restore
+
+Enable provider-managed encrypted daily snapshots plus point-in-time recovery, with keys separated from database credentials. Quarterly, restore the newest backup into an isolated non-production account, validate migration version, constraints, row counts, representative authorized reads and audit/job integrity, record recovery time/point results, then securely destroy the restore. Alert on backup failure and age. Rotate credentials through dual-credential deployment: create/grant, deploy secret, drain pools, verify, revoke old credential. Backup retention and geographic residency require legal/privacy approval; deletion reaches backups on ordinary rotation.

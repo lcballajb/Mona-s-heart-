@@ -1,9 +1,9 @@
 import http from "node:http";
-import { MemoryStore } from "./store.mjs";
+import { createStore } from "./store-factory.mjs";
 import { MonaService } from "./service.mjs";
 import { RxNormProvider, TerminologyCache } from "./terminology.mjs";
 
-const store = new MemoryStore();
+const store = await createStore();
 const service = new MonaService(store);
 const rxnorm = new RxNormProvider({
   enabled: process.env.RXNORM_PROXY_ENABLED === "true",
@@ -96,7 +96,7 @@ const server = http.createServer(async (request, response) => {
       return reply(
         response,
         204,
-        service.verifyEmail((await body(request)).token),
+        await service.verifyEmail((await body(request)).token),
       );
     if (request.method === "POST" && path === "/v1/auth/sign-in") {
       const result = await service.signIn(await body(request));
@@ -110,17 +110,17 @@ const server = http.createServer(async (request, response) => {
       );
     }
     const sessionToken = cookies(request).mh_session;
-    const actor = service.actor(sessionToken);
+    const actor = await service.actor(sessionToken);
     if (!actor)
       return reply(response, 401, { error: "Authentication required" });
-    const session = store.session(sessionToken);
+    const session = await store.session(sessionToken);
     if (
       !["GET", "HEAD"].includes(request.method) &&
-      request.headers["x-csrf-token"] !== session.csrfToken
+      !(await store.validateCsrf(session, request.headers["x-csrf-token"]))
     )
       return reply(response, 403, { error: "CSRF validation failed" });
     if (request.method === "POST" && path === "/v1/auth/sign-out") {
-      service.signOut(sessionToken);
+      await service.signOut(sessionToken);
       return reply(
         response,
         204,
@@ -132,9 +132,9 @@ const server = http.createServer(async (request, response) => {
       );
     }
     if (request.method === "GET" && path === "/v1/account/export")
-      return reply(response, 200, service.exportData(actor));
+      return reply(response, 202, await service.exportData(actor));
     if (request.method === "DELETE" && path === "/v1/account") {
-      service.deleteAccount(actor);
+      await service.deleteAccount(actor);
       return reply(response, 202, { status: "deletion_pending" });
     }
     return reply(response, 404, { error: "Not found" });

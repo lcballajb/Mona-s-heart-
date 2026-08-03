@@ -1,0 +1,3 @@
+# Migrations
+
+Files in `db/migrations` are ordered lexically. `scripts/migrate.mjs` creates `schema_migrations`, checks SHA-256 checksums, and applies each new file in one transaction. `npm run db:version` exposes versions. Never edit an applied file. Use additive, backward-compatible roll-forward changes; destructive SQL requires an explicit reviewed release step, tested encrypted backup, restore timing, data-owner approval, and a compensating plan. PostgreSQL operations that cannot run transactionally must be isolated in a reviewed runner enhancement before use. A failure rolls back the file and leaves no history row.

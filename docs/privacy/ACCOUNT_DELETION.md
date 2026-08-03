@@ -1,0 +1,3 @@
+# Account deletion
+
+A request immediately changes account lifecycle state, revokes sessions, records a request, schedules work after a seven-day cooling-off period and appends an audit event. Verification, cancellation and legal hold are explicit future workflow states. The worker deletes profile/health/content and object data where permitted; anonymizes required organization-history references; retains pseudonymous security/audit and consent evidence under approved schedules; temporarily retains export/deletion orchestration metadata; and preserves legally required organization records. Backups expire through normal encrypted rotation—not instant deletion. Final schedules and organization obligations require privacy and legal approval.
