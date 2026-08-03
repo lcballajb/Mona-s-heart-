@@ -40,3 +40,7 @@ There is no backend, production identity, real authorization, persistence, EHR c
 ## Ownership
 
 © 2026 Prominent Life Investments. Mona’s Heart and all associated software, designs, content, workflows, and documentation are proprietary. All rights reserved. See [LICENSE](LICENSE).
+
+## Secure backend foundation
+
+The production direction is a separate Node/PostgreSQL API; see [ADR-002](docs/architecture/ADR-002-production-backend.md), the [security controls](docs/security/PRODUCTION_CONTROLS.md), and the normalized [migration](db/migrations/001_secure_foundation.sql). The checked-in API repository is useful for security-domain tests but its in-memory adapter is not production persistence. Health features remain demonstration-only and disabled pending professional reviews. Mona's Heart is owned by Prominent Life Investments; no HIPAA compliance claim is made.
