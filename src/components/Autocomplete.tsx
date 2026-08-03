@@ -19,7 +19,8 @@ export function MedicationAutocomplete({
   const [query, setQuery] = useState(""),
     [results, setResults] = useState<MedicationTerm[]>([]),
     [active, setActive] = useState(-1),
-    [loading, setLoading] = useState(false);
+    [loading, setLoading] = useState(false),
+    [open, setOpen] = useState(false);
   useEffect(() => {
     window.clearTimeout(timer.current);
     setActive(-1);
@@ -39,20 +40,28 @@ export function MedicationAutocomplete({
     onSelect(term);
     setQuery(term.genericName);
     setResults([]);
+    setOpen(false);
   };
+  const chooseFreeText = () => {
+    onSelect(null, query.trim());
+    setResults([]);
+    setOpen(false);
+  };
+  const showOptions = open && query.trim().length >= 2 && !loading;
   return (
     <div className="autocomplete">
       <label htmlFor={id}>{label}</label>
       <input
         id={id}
         role="combobox"
-        aria-expanded={results.length > 0}
+        aria-expanded={showOptions}
         aria-controls={`${id}-list`}
         aria-autocomplete="list"
         aria-activedescendant={active >= 0 ? `${id}-${active}` : undefined}
         value={query}
         onChange={(e) => {
           setQuery(e.target.value);
+          setOpen(true);
           onSelect(null);
         }}
         onKeyDown={(e) => {
@@ -68,7 +77,14 @@ export function MedicationAutocomplete({
             e.preventDefault();
             choose(results[active]);
           }
-          if (e.key === "Escape") setResults([]);
+          if (e.key === "Enter" && active === results.length && showOptions) {
+            e.preventDefault();
+            chooseFreeText();
+          }
+          if (e.key === "Escape") {
+            setResults([]);
+            setOpen(false);
+          }
         }}
         placeholder="Type at least 2 characters"
         autoComplete="off"
@@ -79,7 +95,7 @@ export function MedicationAutocomplete({
       {query.length > 0 && query.length < 2 && (
         <small>Enter at least 2 characters.</small>
       )}
-      {results.length > 0 && (
+      {showOptions && (
         <ul id={`${id}-list`} role="listbox">
           {results.map((m, i) => (
             <li
@@ -102,14 +118,12 @@ export function MedicationAutocomplete({
               </button>
             </li>
           ))}
-          <li>
-            <button
-              type="button"
-              onClick={() => {
-                onSelect(null, query);
-                setResults([]);
-              }}
-            >
+          <li
+            id={`${id}-${results.length}`}
+            role="option"
+            aria-selected={active === results.length}
+          >
+            <button type="button" onClick={chooseFreeText}>
               I can’t find my medication — save “{query}” as an Unverified entry
             </button>
           </li>

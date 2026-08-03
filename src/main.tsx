@@ -1285,7 +1285,12 @@ function Medications() {
   const [term, setTerm] = useState<MedicationTerm | null>(null),
     [freeText, setFreeText] = useState(""),
     [show, setShow] = useState(false),
-    [confirmed, setConfirmed] = useState(false);
+    [confirmed, setConfirmed] = useState(false),
+    [status, setStatus] = useState("Current medication"),
+    [strength, setStrength] = useState(""),
+    [doseForm, setDoseForm] = useState(""),
+    [frequency, setFrequency] = useState(""),
+    [visibility, setVisibility] = useState<string>(DEFAULT_HEALTH_VISIBILITY);
   return (
     <AppShell title="Medication timeline">
       <div className="sectionhead">
@@ -1308,16 +1313,21 @@ function Medications() {
                 {
                   term,
                   name: term?.genericName ?? freeText,
-                  status: "Current medication",
-                  strength: term?.strength ?? "",
-                  form: term?.doseForm ?? "",
-                  frequency: "Not specified",
-                  visibility: DEFAULT_HEALTH_VISIBILITY,
+                  status,
+                  strength,
+                  form: doseForm,
+                  frequency: frequency || "Not specified",
+                  visibility,
                   verified: Boolean(term),
                 },
               ]);
               setTerm(null);
               setFreeText("");
+              setStatus("Current medication");
+              setStrength("");
+              setDoseForm("");
+              setFrequency("");
+              setVisibility(DEFAULT_HEALTH_VISIBILITY);
               setConfirmed(false);
               setShow(false);
             }
@@ -1327,12 +1337,14 @@ function Medications() {
             onSelect={(m, f) => {
               setTerm(m);
               setFreeText(f ?? "");
+              setStrength(m?.strength ?? "");
+              setDoseForm(m?.doseForm ?? "");
               setConfirmed(false);
             }}
           />
           <label>
             Status
-            <select>
+            <select value={status} onChange={(e) => setStatus(e.target.value)}>
               <option>Current medication</option>
               <option>Previous medication</option>
               <option>I’m not sure</option>
@@ -1340,15 +1352,25 @@ function Medications() {
           </label>
           <label>
             Strength
-            <input defaultValue={term?.strength} />
+            <input
+              value={strength}
+              onChange={(e) => setStrength(e.target.value)}
+            />
           </label>
           <label>
             Dose form
-            <input defaultValue={term?.doseForm} />
+            <input
+              value={doseForm}
+              onChange={(e) => setDoseForm(e.target.value)}
+            />
           </label>
           <label>
             Frequency
-            <input placeholder="Optional; record existing directions only" />
+            <input
+              value={frequency}
+              onChange={(e) => setFrequency(e.target.value)}
+              placeholder="Optional; record existing directions only"
+            />
           </label>
           <label>
             Start date
@@ -1372,7 +1394,10 @@ function Medications() {
           </label>
           <label>
             Visibility
-            <select defaultValue="private">
+            <select
+              value={visibility}
+              onChange={(e) => setVisibility(e.target.value)}
+            >
               <option value="private">Private</option>
               <option value="approved-connections">Approved connections</option>
               <option value="matched-mentors">Matched mentors</option>
