@@ -27,9 +27,9 @@ jobs:
       DATABASE_SSL: "false"
       NODE_ENV: test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: npm }
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 24, cache: npm }
       - run: npm ci
       - run: npm run db:migrate
       - run: npm run db:seed
@@ -40,3 +40,15 @@ jobs:
       - run: npm test
       - run: npm run test:postgres
       - run: npm run build
+      - run: node scripts/backup.mjs --dry-run
+      - run: node scripts/restore-check.mjs --dry-run
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate

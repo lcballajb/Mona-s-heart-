@@ -54,3 +54,7 @@ The production direction is a separate Node/PostgreSQL API; see [ADR-002](docs/a
 ## Backend persistence
 
 The backend now supports dependency-injected `memory` and `postgres` adapters. Memory is intended only for local demos/tests. Production must set `DATABASE_ADAPTER=postgres`, a secret `DATABASE_URL`, verified TLS, and the pool/timeout settings described in [PostgreSQL setup](docs/backend/POSTGRESQL_SETUP.md); startup fails rather than falling back. Apply `npm run db:migrate` and the idempotent fictional seed with `npm run db:seed`. PostgreSQL integration tests use only `TEST_DATABASE_URL` via `npm run test:postgres`. See [ADR-004](docs/architecture/ADR-004-postgresql-persistence.md) and the operations runbook. Email delivery, production object storage, malware scanning, workers/monitoring, and final privacy, cybersecurity and legal approvals remain outstanding.
+
+## Production-service readiness
+
+Provider-neutral email, object storage, malware scanning, durable workers, shared controls, privacy-conscious observability and health endpoints are documented under `docs/backend` and `docs/operations`. Development adapters are mocks and cannot silently start in production. The staging compose plan uses fictional data only; no live provider, clinical integration, EHR/FHIR connection, or compliance certification is implied. Prominent Life Investments retains proprietary ownership as described in `docs/OWNERSHIP.md`.

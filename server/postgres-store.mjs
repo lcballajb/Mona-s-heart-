@@ -162,6 +162,13 @@ export class PostgresStore {
       revokedAt: null,
     };
   }
+  async updatePassword(id, passwordHash) {
+    const { rows } = await this.query(
+      "UPDATE users SET password_hash=$2,password_algorithm='scrypt-v1',updated_at=now() WHERE id=$1 RETURNING *, ARRAY(SELECT role_code FROM user_roles WHERE user_id=$1) AS roles",
+      [id, passwordHash],
+    );
+    return mapUser(rows[0]);
+  }
   async session(rawToken) {
     const { rows } = await this.query(
       "SELECT * FROM sessions WHERE token_digest=decode($1,'hex') AND revoked_at IS NULL AND expires_at>now()",
@@ -231,8 +238,43 @@ export class PostgresStore {
   }
   async createJob(kind, payloadReference, scheduledAt = this.now()) {
     const { rows } = await this.query(
-      "INSERT INTO background_jobs(kind,payload_reference,scheduled_at) VALUES($1,$2,$3) RETURNING *",
-      [kind, payloadReference, scheduledAt],
+      "INSERT INTO background_jobs(kind,payload_reference,scheduled_at,idempotency_key) VALUES($1,$2,$3,$4) ON CONFLICT(idempotency_key) WHERE idempotency_key IS NOT NULL DO UPDATE SET idempotency_key=excluded.idempotency_key RETURNING *",
+      [kind, payloadReference, scheduledAt, `${kind}:${payloadReference}`],
+    );
+    return rows[0];
+  }
+  async claimJobs({ limit = 1, leaseMs = 60_000 } = {}) {
+    const { rows } = await this.query(
+      `WITH candidates AS (SELECT id FROM background_jobs
+       WHERE dead_lettered=false AND completed_at IS NULL AND scheduled_at<=now()
+       AND (status='queued' OR (status='running' AND locked_at < now()-($2::int * interval '1 millisecond')))
+       ORDER BY scheduled_at FOR UPDATE SKIP LOCKED LIMIT $1)
+       UPDATE background_jobs j SET status='running',locked_at=now(),attempts=attempts+1
+       FROM candidates c WHERE j.id=c.id RETURNING j.*`,
+      [Math.min(limit, 20), leaseMs],
+    );
+    return rows.map((row) => ({
+      ...row,
+      payloadReference: row.payload_reference,
+      correlationId: row.correlation_id,
+      idempotencyKey: row.idempotency_key,
+    }));
+  }
+  async completeJob(id) {
+    const { rows } = await this.query(
+      "UPDATE background_jobs SET status='completed',completed_at=now(),failure_reason=NULL WHERE id=$1 RETURNING *",
+      [id],
+    );
+    return rows[0];
+  }
+  async failJob(id, reason, { maxAttempts = 5, backoffMs = 1000 } = {}) {
+    const { rows } = await this.query(
+      `UPDATE background_jobs SET failure_reason=left($2,500),locked_at=NULL,
+       status=CASE WHEN attempts >= $3 THEN 'failed' ELSE 'queued' END,
+       dead_lettered=(attempts >= $3),
+       scheduled_at=CASE WHEN attempts >= $3 THEN scheduled_at ELSE now()+(($4 * power(2, greatest(attempts-1,0)))::int * interval '1 millisecond') END
+       WHERE id=$1 RETURNING *`,
+      [id, String(reason), maxAttempts, backoffMs],
     );
     return rows[0];
   }

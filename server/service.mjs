@@ -7,13 +7,18 @@ import {
   canViewHealth,
   requireAnyRole,
 } from "./security.mjs";
+import { renderEmail } from "./email-provider.mjs";
 
 const SESSION_MS = 30 * 60 * 1000;
 const TOKEN_MS = 60 * 60 * 1000;
 export class MonaService {
-  constructor(store, emailProvider = null) {
+  constructor(store, emailProvider = null, rateLimiter = null) {
     this.store = store;
     this.emailProvider = emailProvider;
+    this.rateLimiter = rateLimiter;
+    this.dummyPasswordHash = hashPassword(
+      "unknown account comparison password",
+    );
   }
   async register({ email, password, role = "patient" }) {
     if (
@@ -40,9 +45,15 @@ export class MonaService {
       verificationToken,
       TOKEN_MS,
     );
-    await this.emailProvider?.sendVerification({
+    await this.emailProvider?.send({
       to: user.email,
-      token: verificationToken,
+      template: renderEmail({
+        kind: "account_verification",
+        actionUrl: `${process.env.PUBLIC_APP_URL ?? "https://app.example.invalid"}/verify?token=${encodeURIComponent(verificationToken)}`,
+      }),
+    });
+    await this.store.audit("verification_email_requested", user.id, user.id, {
+      templateVersion: "1",
     });
     return { userId: user.id, verificationToken };
   }
@@ -62,10 +73,14 @@ export class MonaService {
   async signIn({ email, password }) {
     const user = await this.store.findUserByEmail(email);
     const now = this.store.clock().getTime();
+    const passwordMatches = await verifyPassword(
+      password,
+      user?.passwordHash ?? (await this.dummyPasswordHash),
+    );
     if (
       !user ||
       (user.lockedUntil && Date.parse(user.lockedUntil) > now) ||
-      !(await verifyPassword(password, user.passwordHash))
+      !passwordMatches
     ) {
       if (user) {
         await this.store.recordLoginFailure(user.id);
@@ -90,6 +105,55 @@ export class MonaService {
       csrfToken: session.csrfToken,
       expiresAt: session.expiresAt,
     };
+  }
+  async requestPasswordReset({ email, locale = "en", region = "global" }) {
+    const generic = {
+      status: "If the account is eligible, an email will be sent",
+    };
+    const user = await this.store.findUserByEmail(String(email ?? ""));
+    if (!user) {
+      await verifyPassword("comparison password", await this.dummyPasswordHash);
+      return generic;
+    }
+    const limit = await this.rateLimiter?.consume(`password_reset:${user.id}`, {
+      limit: 3,
+      windowMs: 60 * 60_000,
+    });
+    if (limit && !limit.allowed) return generic;
+    const token = opaqueToken();
+    await this.store.createAccountToken(
+      user.id,
+      "password_reset",
+      token,
+      30 * 60_000,
+    );
+    await this.emailProvider?.send({
+      to: user.email,
+      template: renderEmail({
+        kind: "password_reset",
+        locale,
+        region,
+        actionUrl: `${process.env.PUBLIC_APP_URL ?? "https://app.example.invalid"}/reset-password?token=${encodeURIComponent(token)}`,
+      }),
+    });
+    await this.store.audit("password_reset_requested", user.id, user.id, {
+      templateVersion: "1",
+    });
+    return generic;
+  }
+  async resetPassword({ token, password }) {
+    const userId = await this.store.consumeAccountToken(
+      "password_reset",
+      token ?? "",
+    );
+    if (!userId)
+      throw Object.assign(new Error("Invalid or expired reset token"), {
+        statusCode: 400,
+      });
+    await this.store.updatePassword(userId, await hashPassword(password));
+    await this.store.revokeUserSessions(userId);
+    await this.store.audit("password_reset_completed", userId, userId);
+    return { status: "password_updated" };
   }
   async signOut(token) {
     const session = await this.store.session(token);

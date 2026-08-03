@@ -1,0 +1,9 @@
+FROM node:24-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY server server
+COPY scripts scripts
+COPY db db
+USER node
+CMD ["node", "server/worker-entry.mjs"]

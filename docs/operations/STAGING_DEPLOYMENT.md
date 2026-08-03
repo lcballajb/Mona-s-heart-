@@ -1,0 +1,3 @@
+# Staging deployment
+
+The compose plan runs PostgreSQL, one-shot migration, API, worker, static frontend and nginx reverse proxy. Use fictional data only. Secrets are mounted/injected from a staging secret manager; `.env` contains references, never values. TLS terminates at the managed ingress, which is the only trusted proxy. Route stdout JSON and provider metrics to the staging sink. Deploy migrations, API, worker, then frontend; validate readiness and smoke tests. Roll back images to the prior digest; never reverse destructive migrations without an approved recovery plan. Redis is optional only after a shared-adapter implementation.

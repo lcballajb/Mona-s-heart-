@@ -1,0 +1,10 @@
+FROM node:24-alpine AS base
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY server server
+COPY scripts scripts
+COPY db db
+USER node
+EXPOSE 3001
+CMD ["node", "server/index.mjs"]
