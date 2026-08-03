@@ -4,18 +4,20 @@ import { databaseMetrics, timedQuery } from "./database.mjs";
 
 const iso = (value) => (value ? new Date(value).toISOString() : null);
 const mapUser = (r) =>
-  r && {
-    id: r.id,
-    email: r.email,
-    passwordHash: r.password_hash,
-    passwordAlgorithm: r.password_algorithm,
-    roles: r.roles ?? [],
-    status: r.status,
-    verifiedAt: iso(r.email_verified_at),
-    failedAttempts: r.failed_attempts,
-    lockedUntil: iso(r.locked_until),
-    createdAt: iso(r.created_at),
-  };
+  r
+    ? {
+        id: r.id,
+        email: r.email,
+        passwordHash: r.password_hash,
+        passwordAlgorithm: r.password_algorithm,
+        roles: r.roles ?? [],
+        status: r.status,
+        verifiedAt: iso(r.email_verified_at),
+        failedAttempts: r.failed_attempts,
+        lockedUntil: iso(r.locked_until),
+        createdAt: iso(r.created_at),
+      }
+    : null;
 
 export class PostgresStore {
   constructor(pool, clock = () => new Date()) {
@@ -166,16 +168,16 @@ export class PostgresStore {
       [tokenDigest(rawToken ?? "")],
     );
     const r = rows[0];
-    return (
-      r && {
-        id: r.id,
-        userId: r.user_id,
-        digest: tokenDigest(rawToken),
-        csrfToken: null,
-        expiresAt: iso(r.expires_at),
-        revokedAt: iso(r.revoked_at),
-      }
-    );
+    return r
+      ? {
+          id: r.id,
+          userId: r.user_id,
+          digest: tokenDigest(rawToken),
+          csrfToken: null,
+          expiresAt: iso(r.expires_at),
+          revokedAt: iso(r.revoked_at),
+        }
+      : null;
   }
   async validateCsrf(session, rawToken) {
     const { rows } = await this.query(

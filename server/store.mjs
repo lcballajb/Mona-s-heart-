@@ -53,11 +53,12 @@ export class MemoryStore {
     return user;
   }
   findUserById(id) {
-    return this.users.get(id);
+    return this.users.get(id) ?? null;
   }
   findUserByEmail(email) {
-    return [...this.users.values()].find(
-      (u) => u.email === email.toLowerCase(),
+    return (
+      [...this.users.values()].find((u) => u.email === email.toLowerCase()) ??
+      null
     );
   }
   createSession(userId, rawToken, ttlMs) {
