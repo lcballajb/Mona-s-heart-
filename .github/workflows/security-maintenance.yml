@@ -1,0 +1,37 @@
+name: Security maintenance
+on:
+  schedule:
+    - cron: "43 8 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Generate CycloneDX SBOM
+        run: npx --yes @cyclonedx/cyclonedx-npm@4.0.3 --output-file sbom.cdx.json
+      - name: Upload review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: supply-chain-inventory
+          path: sbom.cdx.json
+          retention-days: 30
+      - name: Create weekly manual-review issue
+        if: always()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const date = new Date().toISOString().slice(0, 10);
+            try { await github.rest.issues.getLabel({...context.repo, name:'security-maintenance'}); }
+            catch { await github.rest.issues.createLabel({...context.repo, name:'security-maintenance', color:'b60205', description:'Scheduled human review'}); }
+            const title = `[security-maintenance] Weekly review ${date}`;
+            const issues = await github.paginate(github.rest.issues.listForRepo, {...context.repo, state:'open', labels:'security-maintenance'});
+            if (!issues.some(i => i.title === title)) await github.rest.issues.create({...context.repo, title, labels:['security-maintenance'], body:`Run date: ${date}; workflow: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\nReview audit/SBOM, dependency alerts, CI failures, CISA KEV/vendor notices, containers/base images, TLS certificate/domain expiry, credentials and vulnerability SLA. Dependency upgrades require review and must not auto-merge.`});

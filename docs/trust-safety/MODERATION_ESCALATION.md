@@ -1,0 +1,3 @@
+# Moderation escalation
+
+Triage: P0 credible imminent harm/child sexual exploitation/security incident → trained on-call lead and applicable emergency/legal process; P1 doxxing, grooming, threats, dangerous medical misinformation/fraud → restrict reach/account and human review promptly; P2 harassment/spam → normal queue. Preserve minimum evidence with access controls; do not investigate beyond authority. Separate content action from emergency escalation. Record rationale, policy version, reviewer, notices and appeal eligibility. Mandatory-reporting and law-enforcement decisions require jurisdiction-specific counsel/training.

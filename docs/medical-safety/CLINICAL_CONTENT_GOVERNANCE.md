@@ -1,0 +1,3 @@
+# Clinical content governance
+
+No automated medical-content publication is permitted. Every medication, condition, integrative, nutrition, exercise, mindfulness, spiritual, patient-story, or AI explanation record requires: content/version; region; audience; evidence class; sources and dates; benefits/uncertainty; contraindications/interactions; emergency boundary; reviewer role and credentials; conflict declaration; approval/date; expiry; and archived predecessor. Clinical approves general content, Pharmacy medication content, Integrative Health complementary content, and Legal/Privacy patient stories. AI drafts remain labeled and pending human review. Expired/unapproved content is suppressed.

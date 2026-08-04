@@ -1,0 +1,3 @@
+# Research governance
+
+**Research mode defaults OFF.** Product analytics is not automatically research and research is not automatically care. Before a study: written protocol, independent IRB/ethics determination where applicable, specific accessible consent, fair recruitment/compensation, data minimization, de-identification risk assessment, data-sharing agreement, withdrawal process, secondary-use limits, preregistered algorithm/bias evaluation, adverse-event pathway and publication plan. Separate participation from service access; no silent enrollment or model training. Data Governance and an authorized study lead gate access.

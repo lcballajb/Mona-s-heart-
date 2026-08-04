@@ -1,0 +1,3 @@
+# Service shutdown plan
+
+Planning only. Executive, Legal, Privacy, Security, Clinical and Operations approve a shutdown timeline. Inventory obligations/funds/vendors; stop new enrollment; provide accessible advance notice; maintain support and safety messaging; offer authenticated portable export and organization return; honor deletion/retention/legal holds; revoke integrations/keys; verify vendor deletion; preserve required audit/financial records; protect domains from takeover; publish status and final contact. Test export/restore and document users who could not be reached. No data sale is implied or authorized.

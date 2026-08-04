@@ -1,0 +1,3 @@
+# FHIR version policy
+
+No FHIR version is production-supported. Adopt a version only through an ADR identifying base release, implementation guide and patch versions, jurisdiction, capability statement, search/export behavior, terminology bindings and validation tooling. Isolate canonical models from wire adapters; reject unknown profiles safely; preserve source server, resource version, lastUpdated and transformations. Test patient matching, authorization, pagination, references, extensions, errors, bulk export and downgrade/rollback against partner sandboxes. Hospital IT and Interoperability approve migrations.

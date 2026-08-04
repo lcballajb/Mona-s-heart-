@@ -1,0 +1,3 @@
+# Accessibility watch
+
+Monitor W3C WCAG/WAI updates quarterly and browser/screen-reader/voice-control changes monthly. Track contrast, 200–400% resize/reflow, keyboard/focus, reduced motion, captions/transcripts, errors, plain language/cognition, translation/RTL, low bandwidth, older devices/adults and disability-inclusive research. Sources: [W3C WCAG](https://www.w3.org/WAI/standards-guidelines/wcag/) and [WAI-ARIA](https://www.w3.org/WAI/standards-guidelines/aria/). Automated tests are insufficient; no WCAG conformance is claimed until an independent evaluation defines version, level, scope and exceptions.

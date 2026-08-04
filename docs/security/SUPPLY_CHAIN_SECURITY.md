@@ -1,0 +1,3 @@
+# Supply-chain security
+
+Dependabot covers npm and Actions; CI dependency review blocks moderate-or-higher additions. Repository administrators must enable dependency graph/alerts, secret scanning, push protection and code scanning—files cannot prove settings. Weekly maintenance generates an SBOM/license inventory and scans dependencies; container/base-image scanning remains required before production. Pin direct dependencies and Action majors, review changelogs/signatures, prohibit auto-merge, and use least-privilege tokens. Track Node/PostgreSQL/base images/Actions/TLS, certificate/domain expiry, and vendors in the update register. Never store topology or secrets here.

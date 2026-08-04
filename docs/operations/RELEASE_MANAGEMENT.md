@@ -1,0 +1,3 @@
+# Release management
+
+Use semantic versioning for public contracts (`MAJOR.MINOR.PATCH`), with separately versioned policies/content/models. Release checklist: linked approved change; threat/privacy/clinical/accessibility impact; tests and SBOM/licenses; dependency/vulnerability review; migration backup/restore rehearsal; feature flag default; monitoring/SLO/on-call; user/policy notice and consent; support/runbook; rollback owner; changelog with security-sensitive detail withheld. Two-person production approval is required. Canary by non-sensitive cohort/tenant with explicit metrics; do not canary unsafe clinical behavior. No automatic merge or production deploy is established.

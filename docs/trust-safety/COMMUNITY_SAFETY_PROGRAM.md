@@ -1,0 +1,3 @@
+# Community safety program
+
+Community features are not production-ready. Before activation: risk-assess harassment, scams/fraud, impersonation, grooming/exploitation, spam, hate/violence/sexual content, predatory supplement sales, unlicensed care, medical misinformation, scraping/stalking/doxxing, takeover/ban evasion/coordinated abuse and self-harm. Require reporting/blocking, rate limits, restricted discovery, evidence-preserving audit, trained moderation, metrics, appeals, privacy controls and crisis boundaries. Never promise continuous monitoring or emergency response unless staffed and verified.

@@ -1,0 +1,21 @@
+name: Standards watch
+on:
+  schedule:
+    - cron: "31 10 8 * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const date = new Date().toISOString().slice(0, 10);
+            try { await github.rest.issues.getLabel({...context.repo, name:'standards-watch'}); }
+            catch { await github.rest.issues.createLabel({...context.repo, name:'standards-watch', color:'1d76db', description:'Scheduled human review'}); }
+            const title = `[standards-watch] Review interoperability and terminology ${date.slice(0, 7)}`;
+            const issues = await github.paginate(github.rest.issues.listForRepo, {...context.repo, state:'open', labels:'standards-watch'});
+            if (!issues.some(i => i.title === title)) await github.rest.issues.create({...context.repo, title, labels:['standards-watch'], body:`Checked/reminder date: ${date}\n\nHuman review required: official HL7, SMART, ONC, NLM, CDC, WHO, SNOMED, LOINC and DICOM sources. Record versions, licenses, breaking risk, provenance and migration tests. Never auto-import or publish terminology/medical content.`});

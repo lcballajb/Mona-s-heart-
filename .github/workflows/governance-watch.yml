@@ -1,0 +1,23 @@
+name: Governance watch
+on:
+  schedule:
+    - cron: "17 9 1 * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create monthly governance review reminder
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const date = new Date().toISOString().slice(0, 10);
+            try { await github.rest.issues.getLabel({...context.repo, name:'governance-watch'}); }
+            catch { await github.rest.issues.createLabel({...context.repo, name:'governance-watch', color:'5319e7', description:'Scheduled human review'}); }
+            const title = `[governance-watch] Monthly review ${date.slice(0, 7)}`;
+            const existing = await github.paginate(github.rest.issues.listForRepo, {...context.repo, state: 'open', labels: 'governance-watch'});
+            if (existing.some(i => i.title === title)) return;
+            await github.rest.issues.create({...context.repo, title, labels: ['governance-watch'], body: `Source check date: ${date}\n\nReview authoritative sources in docs/governance/AUTHORITATIVE_SOURCE_REGISTER.md; update regulatory, policy, AI vendor, accessibility, technology, terminology and vulnerability registers. Record uncertainty and route decisions to qualified owners. Do not automatically change or publish legal or medical content.`});
