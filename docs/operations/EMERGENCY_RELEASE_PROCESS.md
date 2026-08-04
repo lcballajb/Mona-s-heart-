@@ -1,0 +1,3 @@
+# Emergency release process
+
+Security or safety lead declares severity and narrow scope. Use a protected hotfix branch, peer review, required targeted tests, artifact provenance and explicit rollback; never bypass secret scanning or introduce wildcard permissions. Security/Clinical/Privacy/Legal approve according to impact. Deploy canary only when it reduces risk, monitor, and notify affected users/regulators only after qualified determination. Complete full regression, documentation, policy/content review and post-incident review within five business days. Emergency does not authorize automatic merging.

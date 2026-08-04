@@ -1,0 +1,3 @@
+# Minors readiness plan
+
+**Minors mode is OFF by default.** Minimum age, guardian authority/consent and age-assurance method remain blocked on jurisdiction-specific Legal/Privacy review. Do not knowingly collect minor health data or enable minor matching, direct messaging or video. Before any pilot: data minimization/no targeted ads, teen-private defaults, guardian/teen rights boundaries, restricted contact, mandatory trained moderation, report/block, emergency process, deletion/retention, school/pediatric contracts, abuse prevention, accessible notices and independent child-safety assessment. Age assurance cannot be represented as certain.

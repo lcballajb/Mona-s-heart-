@@ -1,11 +1,11 @@
-# Ai Model Registry
+# AI model registry
 
-> Draft—requires review by qualified legal, privacy, security, and healthcare professionals before production use.
+> **Draft—requires review by qualified legal, privacy, security, healthcare, and regulatory professionals before production use.**
 
-No model is approved or configured in this prototype. A future entry must identify provider, model/version, region, purpose, data terms, retention, evaluations, approval owners, deployment date, and retirement date.
+**Default:** AI disabled. There are no approved providers/models. An empty allowlist must fail closed.
 
-## Ownership
+| Provider | Model/version | Approved / prohibited use            | Health-data eligibility | Retention / training | Region / contract  | Security / privacy / clinical review       | Evaluation    | Rollback / deprecation    | Last review |
+| -------- | ------------- | ------------------------------------ | ----------------------- | -------------------- | ------------------ | ------------------------------------------ | ------------- | ------------------------- | ----------- |
+| None     | None          | No use approved / all use prohibited | Not established         | Unknown / unknown    | None / no contract | Not reviewed / not reviewed / not reviewed | Not evaluated | Disable `AI_ENABLED`; N/A | 2026-08-04  |
 
-Mona’s Heart is a healthcare support application developed and operated by Prominent Life Investments.
-
-© 2026 Prominent Life Investments. Mona’s Heart and all associated software, designs, content, workflows, and documentation are proprietary. All rights reserved.
+New entries require exact immutable provider/model identifiers, signed data terms, regional route, evaluation thresholds and evidence links. Health data stays prohibited until Security, Privacy, Legal and Clinical explicitly approve it.

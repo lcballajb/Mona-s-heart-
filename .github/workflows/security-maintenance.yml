@@ -1,0 +1,64 @@
+name: Security maintenance
+on:
+  schedule:
+    - cron: "43 8 * * *" # daily advisory and operational-security reminder
+    - cron: "53 8 * * 1" # weekly SBOM and repository security review
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: security-maintenance
+  cancel-in-progress: false
+jobs:
+  daily-reminder:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '43 8 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Create daily human-review issue
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const date = new Date().toISOString().slice(0, 10);
+            const label = 'security-maintenance';
+            try { await github.rest.issues.getLabel({...context.repo, name: label}); }
+            catch { await github.rest.issues.createLabel({...context.repo, name: label, color: 'b60205', description: 'Scheduled human security review'}); }
+            const title = `[security-maintenance] Daily triage ${date}`;
+            const open = await github.paginate(github.rest.issues.listForRepo, {...context.repo, state: 'open', labels: label});
+            if (open.some(issue => issue.title === title)) return;
+            const body = `Run date: ${date}\n\nReview dependency/Dependabot and CISA KEV signals, secret-scanning alerts, failed CI, runtime/error/API/database alerts, certificate/domain expiry and critical vendor notices. Repository automation cannot inspect external runtime or organization settings; attach evidence or mark unavailable. Apply the vulnerability SLA. Do not auto-merge or change production.`;
+            await github.rest.issues.create({...context.repo, title, labels: [label], body});
+  weekly-inventory:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '53 8 * * 1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Generate pinned-tool CycloneDX SBOM
+        run: npx --yes @cyclonedx/cyclonedx-npm@4.0.3 --output-file sbom.cdx.json
+      - name: Upload review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: supply-chain-inventory
+          path: sbom.cdx.json
+          retention-days: 30
+      - name: Create weekly review issue
+        if: always()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const date = new Date().toISOString().slice(0, 10);
+            const label = 'security-maintenance';
+            try { await github.rest.issues.getLabel({...context.repo, name: label}); }
+            catch { await github.rest.issues.createLabel({...context.repo, name: label, color: 'b60205', description: 'Scheduled human security review'}); }
+            const title = `[security-maintenance] Weekly inventory ${date}`;
+            const open = await github.paginate(github.rest.issues.listForRepo, {...context.repo, state: 'open', labels: label});
+            if (open.some(issue => issue.title === title)) return;
+            const body = `Run date: ${date}\nWorkflow evidence: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\nReview audit/SBOM artifact and license inventory, repository health, documentation, Actions, containers/base images, credentials/keys and vulnerability register. Record failures even if the SBOM was not produced. Dependency updates require a reviewed PR and must not auto-merge.`;
+            await github.rest.issues.create({...context.repo, title, labels: [label], body});

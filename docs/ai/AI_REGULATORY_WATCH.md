@@ -1,0 +1,3 @@
+# AI regulatory watch
+
+Track monthly: EU AI Act implementation, NIST AI RMF and Generative AI Profile, FDA AI-enabled-device guidance when intended use may trigger it, HHS/ONC healthcare guidance, bias/medical benchmarks and prompt-injection research. Official anchors: [EU Commission AI Act](https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai), [NIST AI RMF](https://www.nist.gov/itl/ai-risk-management-framework), [FDA AI/ML medical devices](https://www.fda.gov/medical-devices/software-medical-device-samd/artificial-intelligence-and-machine-learning-aiml-enabled-medical-devices). Legal determines applicability; Clinical determines care risk. Research signals trigger evaluation, not automatic model/content changes.

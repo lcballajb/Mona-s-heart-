@@ -1,0 +1,3 @@
+# Change management
+
+Classify standard/normal/emergency and product, data, security, legal, clinical, AI or infrastructure impact. The issue records rationale, scope, risk, owners, approvals, evidence, communication, migration and rollback. Database checklist: backward-compatible expand/migrate/contract, transaction/locks/capacity, backup+restore, tenant/access/audit, dry run and rollback limits. Feature flags must fail safely, have owner/expiry and no insecure mock fallback. Deprecations require inventory, dates, migration guidance, telemetry respecting privacy and user/partner notice. Changelog states user impact and known limits.

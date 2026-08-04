@@ -11,3 +11,9 @@ Implement backend identity, authorization, consent, audit, moderation, rate limi
 ## Future evaluation
 
 Separately approve AI providers, SMART on FHIR, hospital mode, minors, international regions, WebRTC, and research. No item implies clinical, legal, or hospital approval.
+
+## Future phase: governed multi-agent operating system (planning only)
+
+**Planned future architecture—requires security, privacy, AI-governance, clinical-safety, legal, and operational review before implementation.**
+
+The planning foundation is in [`docs/agents/AGENT_ROADMAP.md`](docs/agents/AGENT_ROADMAP.md). Phase A proposes coordination and read-mostly agents; Phase B proposes specialist implementation-support agents; Phase C proposes hospital, partnership, localization, analytics, cost, research-governance, and global-expansion agents. Every role remains unapproved, feature-flagged off, least-privilege, human-supervised, auditable, and unable to auto-merge, deploy directly to production, diagnose, prescribe, publish controlled content, cross privacy boundaries, or learn from production user data without explicit governance and consent.

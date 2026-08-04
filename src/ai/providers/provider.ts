@@ -17,10 +17,21 @@ export type GroundedOutput = {
 export interface AIProvider {
   organize(input: string, sources: GroundedSource[]): Promise<GroundedOutput>;
 }
+
+// Exact provider/model identifiers are added only after every approval recorded in
+// docs/ai/AI_MODEL_REGISTRY.md. An empty registry deliberately disables AI.
+export const APPROVED_AI_MODELS: readonly string[] = [];
+
+export function isApprovedAIModel(provider?: string, model?: string) {
+  return Boolean(
+    provider && model && APPROVED_AI_MODELS.includes(`${provider}:${model}`),
+  );
+}
+
 export function isAIConfigured(env: Record<string, string | undefined>) {
   return (
     env.AI_ENABLED === "true" &&
-    Boolean(env.AI_PROVIDER) &&
+    isApprovedAIModel(env.AI_PROVIDER, env.AI_MODEL) &&
     Boolean(env.AI_API_KEY)
   );
 }

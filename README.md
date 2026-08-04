@@ -38,6 +38,10 @@ npm run format:check
 
 Major routes include `/`, `/signup`, `/onboarding`, `/dashboard`, `/health-profile`, `/medications`, `/matches`, `/messages`, `/calls`, `/documents`, `/wellness`, `/medical`, `/ai`, `/hospital`, `/accessibility`, `/privacy`, and `/terms`.
 
+## Documentation entry points
+
+Start with the [documentation map](docs/README.md), [system overview](docs/architecture/SYSTEM_OVERVIEW.md), [master repository audit](docs/governance/MASTER_REPOSITORY_AUDIT.md), [risk register](docs/governance/RISK_REGISTER.md), and [production Go/No-Go checklist](docs/governance/PRODUCTION_GO_NO_GO.md). Environment and CI/CD behavior are documented in the operations directory.
+
 ## Architecture and boundaries
 
 `src/health` contains structured mock terminology; replace its search implementation with an authenticated, rate-limited server proxy before live terminology use. `src/ai` contains provider-neutral contracts, schemas, and guardrails. Client code must never import a provider secret. `src/features/flags.ts` defaults every high-risk capability off. See `docs/KNOWN_LIMITATIONS.md` before evaluation.
