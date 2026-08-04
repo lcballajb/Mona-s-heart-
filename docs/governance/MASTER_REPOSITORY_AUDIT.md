@@ -1,8 +1,8 @@
 # Master repository hardening and maturity audit
 
 **Audit date:** 2026-08-04  
-**Commit assessed:** `4466378` plus the corrections in this branch  
-**Scope:** all 250 tracked files present at audit start; 8,123 lines across `src/`, `server/`, `tests/`, `scripts/`, and `db/`  
+**Commit range assessed:** `77e0df1..HEAD` on the current governance branch
+**Scope:** all 274 tracked files on the governance branch, including every one of the 109 files added or changed from `77e0df1`; source, workflows, scripts, configuration, and 181 Markdown documents
 **Decision:** **No-Go for production or real health data.** Suitable only for fictional-data development and control design.
 
 ## Evidence labels
@@ -21,8 +21,10 @@ Scores measure repository evidence, not legal compliance, operational effectiven
 | Repository maturity   |          58 | Versioned architecture, migrations, CI, runbooks, and tests exist; production adapters, deployment evidence, support operations, and independent reviews do not.                                                                                                                     |
 | Security              |          62 | Secure defaults, hashed credentials, CSRF, authorization, append-only audit schema, rate limits, headers, dependency review, and threat documents exist; SAST, secret scanning settings, container scanning, penetration results, production IAM, and alert evidence are unverified. |
 | Production readiness  |          34 | PostgreSQL and provider boundaries exist, but vendor implementations, production topology, real restore evidence, E2E/load tests, on-call, and Go/No-Go approvals are missing.                                                                                                       |
+| Enterprise readiness  |          24 | Organization/RLS and hospital/FHIR plans exist; no approved tenant administration, SSO/SCIM, procurement evidence, contractual SLA, partner sandbox, enterprise support, production IaC, or hospital IT approval exists.                                                             |
 | Governance            |          57 | Registers, RACI, cadence, policy control, and change/release procedures exist; named people, completed reviews, evidence links, risk acceptances, and governance meeting records are missing.                                                                                        |
 | AI governance         |          64 | AI is disabled, the allowlist is empty, output types/guardrails/prompt and model registers exist; no configured provider, approved model, runtime integration, audit trail, evaluation result, cost budget, or clinical approval exists.                                             |
+| Medical safety        |          46 | Safety boundaries, evidence classes, terminology provenance, association gates, and human-review requirements exist; no approved clinical content corpus, reviewer roster, advisory board, validation result, or adverse-event operation exists.                                     |
 | Accessibility         |          42 | Semantic UI intentions, checklist, known limitations, and test matrix exist; no automated accessibility suite, browser/assistive-technology evidence, Lighthouse audit, or independent WCAG evaluation exists.                                                                       |
 | Technical debt health |          52 | The codebase is small, typed, formatted, and adapter-oriented; frontend concentration in `src/main.tsx`, missing E2E/performance coverage, stale runtime/dependency migration work, and numerous unstaffed production integrations increase debt.                                    |
 
@@ -119,3 +121,42 @@ The observability module, redaction rules, health/readiness endpoints and error-
 ## Maintainer conclusion
 
 Keep the repository in fictional-data prototype status. The highest-value next step is not new feature code: it is to assign accountable humans, validate the external settings and vendor boundaries that source control cannot prove, close critical risks R-001 through R-010, and produce repeatable test/exercise evidence. Re-score only after evidence is linked; do not interpret the scores as compliance or approval.
+
+## Final production-readiness verification
+
+**Scope:** every one of the 109 files added or changed between `77e0df1` and this governance branch, plus all current workflows, scripts, tracked files, and documentation relationships. Verification is repository-only; deployed services, GitHub settings, contracts, staffing, and professional decisions were not available.
+
+| Check                    | Verified repository result                                                                                                                                                                        | Remaining limitation                                                                                                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Duplicate files/scripts  | No byte-identical tracked files; no duplicate script basename or package-script key                                                                                                               | Semantic similarity still requires owner review when scope changes                                                                                                |
+| Documentation overlap    | `docs/README.md` names canonicals; governance files state distinct boundaries/cross-references; no byte-identical document exists                                                                 | Global/accessibility `KNOWN_LIMITATIONS.md` and documentation/policy-history `README.md` pairs have distinct scoped purposes; consolidating them would lose scope |
+| Policies                 | Unique policy filenames/scopes; common lifecycle centralized in `POLICY_CONTROL_STANDARD.md`; all remain unapproved drafts                                                                        | Qualified legal/privacy/security/clinical/regulatory approval is absent                                                                                           |
+| Workflows                | Four unique purposes; staggered schedules; explicit permissions, concurrency, timeouts, failure behavior, and CI/CD matrix                                                                        | External settings, runner policy, execution history, alerts, billing, and Advanced Security are unverified                                                        |
+| Links/orphans            | All relative Markdown links resolve; complete documentation inventory links every Markdown document                                                                                               | External URLs were not fetched where the environment proxy blocked access                                                                                         |
+| Roadmaps/checklists/ADRs | Root roadmap is strategic, 90-day plan is execution, agent roadmap is future architecture; checklists have distinct release/accessibility/rollback purposes; ADR numbers and decisions are unique | Human owners must prevent future drift                                                                                                                            |
+
+## Remaining readiness gaps by operating domain
+
+| Domain                            | Status                       | Required evidence before production or affected feature                                                                                                                                         |
+| --------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Production / DevOps / scalability | Blocked                      | Approved production architecture/IaC, non-mock providers, IAM/KMS/secrets, protected deployment, capacity/load/soak tests, autoscaling/failure tests, canary and rollback evidence              |
+| Security                          | Requires Human Review        | Repository settings, current CVE/license/container/SAST/secret results, cloud threat model, penetration test, SIEM/on-call exercise, credential/key rotation and accepted residual risks        |
+| Privacy / regulatory              | Requires Human Review        | Actual data/vendor map, launch jurisdictions, counsel applicability decisions, approved notices/consents/rights/retention/transfers and end-to-end deletion/export evidence                     |
+| AI governance                     | Blocked                      | Approved provider/model/version/use, contract/data terms/region, enforced gateway, prompt/tool/source registry, representative evaluation, audit/cost controls and rollback rehearsal           |
+| Medical safety                    | Blocked                      | Qualified Clinical/Pharmacy/Integrative reviewers, approved content records, adverse-event process, expiry/suppression tests and independent clinical review                                    |
+| Hospital / enterprise             | Blocked                      | Named partner, tenant/admin/identity requirements, FHIR/SMART profile and sandbox evidence, procurement/security questionnaire, BAA/DPA decision, SLA/support and Hospital IT/clinical approval |
+| Customer support / IT operations  | Missing                      | Staffed hours/SLAs, identity verification, knowledge approval, ticket privacy/access, escalation/on-call, accessibility, incident communication and quality review                              |
+| Monitoring / analytics            | Partially complete           | Approved telemetry purposes, SLOs/dashboards/alerts, database/queue/API/browser monitoring, error provider, synthetic checks, small-cell/privacy controls and response evidence                 |
+| Disaster recovery / continuity    | Partially complete           | Approved RTO/RPO, production backups, witnessed restore/reconciliation, dependency/site scenario, communications exercise, alternate staffing and executive acceptance                          |
+| Cost optimization                 | Missing operational evidence | Vendor/cloud/model budgets, unit economics, cost allocation, anomaly alerts, capacity forecast and rule that savings cannot weaken safety/privacy/security/SLOs                                 |
+| Accessibility / performance       | Requires Human Review        | Automated and manual AT/browser testing, independent scoped evaluation, Lighthouse/performance budgets, critical-journey latency, low-bandwidth/older-device and load evidence                  |
+
+## Remaining risks, technical debt, and manual work
+
+- **Risks:** the canonical open risks remain R-001 through R-015 in the [risk register](RISK_REGISTER.md); no risk was closed by this documentation verification.
+- **Technical debt:** TD-001 through TD-010 remain in the [technical-debt register](../operations/TECHNICAL_DEBT_REGISTER.md), notably browser E2E/accessibility, load testing, production providers, SAST/secret/container coverage, API contracts, and named governance ownership.
+- **Manual work before production:** assign named accountable humans; obtain qualified legal/privacy/regulatory and clinical reviews; select/review vendors; verify GitHub/cloud controls; implement production providers/IaC/monitoring/support; execute penetration, accessibility, capacity, backup/restore, incident, DR and business-continuity tests; approve policies/content; complete a scoped [Go/No-Go](PRODUCTION_GO_NO_GO.md) with dated evidence.
+
+## Document boundary and cross-references
+
+Point-in-time synthesis and scores only; canonical live risks, debt, and release gates remain separate. Use the [gap analysis](COMPREHENSIVE_GAP_ANALYSIS.md), [risk register](RISK_REGISTER.md), [technical-debt register](../operations/TECHNICAL_DEBT_REGISTER.md), [scorecard](PRODUCTION_READINESS_SCORECARD.md), and [Go/No-Go checklist](PRODUCTION_GO_NO_GO.md).

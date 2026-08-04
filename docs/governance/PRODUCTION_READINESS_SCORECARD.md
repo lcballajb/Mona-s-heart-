@@ -34,3 +34,7 @@ The reproducible repository maturity, security, production, governance, AI, acce
 | Governed multi-agent operating system | Future capability / Blocked | Named accountable humans; approved registry and model/tool/source inventory; threat/privacy/clinical/legal reviews; synthetic adversarial evaluation; least-privilege gateway; audit/cost controls; tested kill switch and rollback; separately approved Phase A sandbox. Planning documents alone do not satisfy this gate. |
 
 No production-readiness score includes an implemented agent system. Every proposed agent is disabled and has no production, user-data, merge, deployment, diagnosis, prescribing, or controlled-publication authority.
+
+## Document boundary and cross-references
+
+Persistent gate-status summary only; the Go/No-Go checklist makes scoped release decisions. Use the [master audit](MASTER_REPOSITORY_AUDIT.md), [gap analysis](COMPREHENSIVE_GAP_ANALYSIS.md), [risk register](RISK_REGISTER.md), and [Go/No-Go checklist](PRODUCTION_GO_NO_GO.md).

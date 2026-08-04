@@ -16,3 +16,7 @@
 | Support/exit           | Support and incident communications staffed; export/deletion/vendor exit/shutdown paths tested              | No-Go                       |
 
 A “Go” decision records commit/artifact, environment, scope, exclusions, evidence URLs, expiration, residual risks and every approver. Conditional approval must use expiring feature flags and must not waive a critical safety, privacy, security, or legal gate.
+
+## Document boundary and cross-references
+
+Per-release approval checklist only; it does not replace the evidence audit or risk treatment record. Use the [master audit](MASTER_REPOSITORY_AUDIT.md), [risk register](RISK_REGISTER.md), [scorecard](PRODUCTION_READINESS_SCORECARD.md), and [release management](../operations/RELEASE_MANAGEMENT.md).

@@ -22,3 +22,7 @@ Scheduled workflows create reminder/scan issues only. They never decide applicab
 | Annual    | Governance issue                                                                                    | DR/BC validation, all policies, roadmap, vendor/insurance/IP, hospital readiness and independent accessibility/clinical reviews   |
 
 An issue is a reminder, not evidence of completion. The owner closes it only with source dates, reviewer, decision, uncertainty, follow-up, approval and artifact links. Overdue critical reviews are recorded in the risk register and block the affected release.
+
+## Document boundary and cross-references
+
+Cadence and evidence process only; domain registers retain their own decisions and histories. Use the [source register](AUTHORITATIVE_SOURCE_REGISTER.md), [regulatory watch](REGULATORY_WATCH_REGISTER.md), [standards watch](../interoperability/STANDARDS_WATCH.md), [security update register](../security/SECURITY_UPDATE_REGISTER.md), and [technology watch](../operations/TECHNOLOGY_WATCH.md).

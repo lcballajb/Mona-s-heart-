@@ -16,3 +16,7 @@ R=research/recommend, A=approve, I=implement, V=verify, C=communicate. One perso
 | Community safety              | Trust & Safety               | T&S lead                        | T&S/Engineering     | QA+Privacy                                  | Support                    |
 | Hospital integration          | Interop+Hospital IT          | Hospital IT + Mona owners       | Engineering         | Partner security/clinical                   | Account owner              |
 | Vendor                        | Procurement/Security/Privacy | Legal+business owner            | Operations          | Security/Privacy                            | Affected users if required |
+
+## Document boundary and cross-references
+
+Role-accountability model only; named people and release-specific approvals must be recorded elsewhere. Use the [policy workflow](POLICY_CHANGE_WORKFLOW.md), [90-day plan](90_DAY_ACTION_PLAN.md), [Go/No-Go checklist](PRODUCTION_GO_NO_GO.md), and [release management](../operations/RELEASE_MANAGEMENT.md).

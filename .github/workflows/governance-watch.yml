@@ -16,9 +16,13 @@ on:
 permissions:
   contents: read
   issues: write
+concurrency:
+  group: governance-watch
+  cancel-in-progress: false
 jobs:
   reminder:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Create governance review issue
         uses: actions/github-script@v8

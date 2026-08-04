@@ -44,3 +44,7 @@ URLs are starting points, not proof of applicability or exhaustive research. Off
 | React Native | https://reactnative.dev/versions | Native framework lifecycle if adopted | Global | Official release docs | Quarterly | Mobile Engineering | Not fetched—proxy 403 | 2026-11-04 |
 
 Source dates for individual decisions must be recorded in the applicable register. Blogs, social media, forums, advertisements and vendor marketing cannot be the sole authority.
+
+## Document boundary and cross-references
+
+Source directory only; it does not decide applicability, implementation, or approval. Use the [regulatory watch](REGULATORY_WATCH_REGISTER.md), [standards watch](../interoperability/STANDARDS_WATCH.md), [AI regulatory watch](../ai/AI_REGULATORY_WATCH.md), and [clinical governance](../medical-safety/CLINICAL_CONTENT_GOVERNANCE.md).

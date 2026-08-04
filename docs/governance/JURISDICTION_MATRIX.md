@@ -10,3 +10,7 @@ No market is authorized by this document. Before launch, Product supplies user l
 | EEA / UK                         | Blocked | GDPR/UK assessment, DPIA, representative/transfer decisions, EU AI/MDR/EHDS analysis      | Before expansion        |
 | Canada, Brazil, Australia, India | Blocked | Country/province counsel, localization, rights and transfer implementation                | Before expansion        |
 | All other countries              | Blocked | Named-country legal and clinical-market review                                            | Before marketing/access |
+
+## Document boundary and cross-references
+
+Market gating only; qualified counsel records applicability decisions in the legal log. Use the [regulatory watch](REGULATORY_WATCH_REGISTER.md), [legal review log](LEGAL_REVIEW_LOG.md), [policy workflow](POLICY_CHANGE_WORKFLOW.md), and [cross-border plan](../privacy/CROSS_BORDER_DATA.md).

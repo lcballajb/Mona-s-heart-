@@ -7,9 +7,13 @@ on:
 permissions:
   contents: read
   issues: write
+concurrency:
+  group: standards-watch
+  cancel-in-progress: false
 jobs:
   reminder:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/github-script@v8
         with:

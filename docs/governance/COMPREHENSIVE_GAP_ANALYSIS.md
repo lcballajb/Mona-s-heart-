@@ -62,3 +62,7 @@ Do not accept real user data until qualified owners verify production identity/a
 ## Method and uncertainty
 
 Reviewed tracked source, tests, configuration and existing documentation; no deployed environment, GitHub settings, vendor contract, legal advice, penetration report, clinical validation or accessibility audit was available. Reassess after each material implementation and independent evidence review.
+
+## Document boundary and cross-references
+
+Domain gap inventory only; live risk treatment and release decisions belong elsewhere. Use the [master audit](MASTER_REPOSITORY_AUDIT.md), [risk register](RISK_REGISTER.md), [readiness scorecard](PRODUCTION_READINESS_SCORECARD.md), and [Go/No-Go checklist](PRODUCTION_GO_NO_GO.md).

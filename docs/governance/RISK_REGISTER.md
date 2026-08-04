@@ -23,3 +23,7 @@
 ## Update protocol
 
 The owner records treatment issue, due date, residual likelihood/impact, evidence link, approver, review date and one of **Open**, **Mitigating**, **Accepted**, **Transferred**, or **Closed**. Legal, clinical, privacy, accessibility and security risks cannot be self-accepted by Engineering. Critical overdue items block the affected release under the [Go/No-Go checklist](PRODUCTION_GO_NO_GO.md).
+
+## Document boundary and cross-references
+
+Canonical live risk-treatment register; it does not duplicate the gap inventory or technical-debt backlog. Use the [gap analysis](COMPREHENSIVE_GAP_ANALYSIS.md), [technical-debt register](../operations/TECHNICAL_DEBT_REGISTER.md), [scorecard](PRODUCTION_READINESS_SCORECARD.md), and [Go/No-Go checklist](PRODUCTION_GO_NO_GO.md).
