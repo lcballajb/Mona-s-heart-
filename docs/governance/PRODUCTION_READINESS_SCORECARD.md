@@ -20,3 +20,7 @@ Statuses: Complete, Partially complete, Missing, Blocked, Requires professional 
 | International/mobile/app stores          | Blocked                      | Country/store-specific review and implementation             |
 
 **Overall: Blocked for production and real user data.** Product owner may change a status only with linked, scoped, dated evidence and verifier identity; professional-review items cannot be self-approved.
+
+## Numeric cross-reference
+
+The reproducible repository maturity, security, production, governance, AI, accessibility and technical-debt scores are maintained in [`MASTER_REPOSITORY_AUDIT.md`](MASTER_REPOSITORY_AUDIT.md). This gate table remains the authoritative status view. A numeric score can never override a Blocked or Requires professional review gate.

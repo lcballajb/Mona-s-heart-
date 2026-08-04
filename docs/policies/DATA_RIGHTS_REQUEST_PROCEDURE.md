@@ -16,13 +16,13 @@
 | Re-consent requirement        | To be determined during legal review                                    |
 | Archived prior version        | None—initial version                                                    |
 
-## Purpose and boundaries
+## Policy-specific scope
 
-This draft records the product boundary and is not a representation of compliance, validation, approval, registration, or clearance. It must be tailored to actual data flows, jurisdictions, contracts, and released features before use. Mona’s Heart is not an emergency service; users should contact local emergency services when immediate help is needed.
+Define intake, accessible channels, identity/authority verification, jurisdiction triage, response timing, secure export, correction/deletion/appeal, denial reasons, audit and vendor coordination.
 
-## Required review
+## Shared control
 
-The accountable owner must document applicable law, product behavior, data categories, recipients, retention, user choices, accessibility, and complaint/escalation paths. Medical and wellness material is educational, must not replace professional care, and requires human clinical review. AI output must be identified, constrained to an approved use, and human-reviewed before it can affect care or published health content.
+Lifecycle, evidence and approval requirements are defined in [`POLICY_CONTROL_STANDARD.md`](POLICY_CONTROL_STANDARD.md). This file must still receive independent policy-specific review and approval.
 
 ## Change control
 

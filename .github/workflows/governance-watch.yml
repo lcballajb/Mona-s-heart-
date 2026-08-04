@@ -1,8 +1,18 @@
 name: Governance watch
 on:
   schedule:
-    - cron: "17 9 1 * *"
+    - cron: "17 9 * * 1" # weekly repository and documentation review
+    - cron: "23 9 1 * *" # monthly architecture, debt, cost, and AI review
+    - cron: "29 9 1 1,4,7,10 *" # quarterly governance/privacy/security review
+    - cron: "37 9 15 1 *" # annual policy, roadmap, vendor, DR, and BC review
   workflow_dispatch:
+    inputs:
+      cadence:
+        description: Review cadence
+        required: true
+        default: monthly
+        type: choice
+        options: [weekly, monthly, quarterly, annual]
 permissions:
   contents: read
   issues: write
@@ -10,14 +20,30 @@ jobs:
   reminder:
     runs-on: ubuntu-latest
     steps:
-      - name: Create monthly governance review reminder
+      - name: Create governance review issue
         uses: actions/github-script@v8
         with:
           script: |
+            const cadenceBySchedule = {
+              '17 9 * * 1': 'weekly',
+              '23 9 1 * *': 'monthly',
+              '29 9 1 1,4,7,10 *': 'quarterly',
+              '37 9 15 1 *': 'annual',
+            };
+            const cadence = context.payload.inputs?.cadence ?? cadenceBySchedule[context.payload.schedule] ?? 'manual';
+            const reviews = {
+              weekly: 'repository health, failed CI, documentation drift, overdue risks and maintenance issues',
+              monthly: 'architecture decisions, technical debt, service/vendor cost, AI usage/model/vendor status, platforms and accessibility',
+              quarterly: 'dependency strategy, platform upgrades, governance, privacy, security, clinical content, vendors and restore/incident exercises',
+              annual: 'disaster recovery, business continuity, every policy, technology roadmap, vendors/insurance/IP, hospital readiness and independent reviews',
+              manual: 'the scoped governance items selected by the operator',
+            };
             const date = new Date().toISOString().slice(0, 10);
-            try { await github.rest.issues.getLabel({...context.repo, name:'governance-watch'}); }
-            catch { await github.rest.issues.createLabel({...context.repo, name:'governance-watch', color:'5319e7', description:'Scheduled human review'}); }
-            const title = `[governance-watch] Monthly review ${date.slice(0, 7)}`;
-            const existing = await github.paginate(github.rest.issues.listForRepo, {...context.repo, state: 'open', labels: 'governance-watch'});
-            if (existing.some(i => i.title === title)) return;
-            await github.rest.issues.create({...context.repo, title, labels: ['governance-watch'], body: `Source check date: ${date}\n\nReview authoritative sources in docs/governance/AUTHORITATIVE_SOURCE_REGISTER.md; update regulatory, policy, AI vendor, accessibility, technology, terminology and vulnerability registers. Record uncertainty and route decisions to qualified owners. Do not automatically change or publish legal or medical content.`});
+            const label = 'governance-watch';
+            try { await github.rest.issues.getLabel({...context.repo, name: label}); }
+            catch { await github.rest.issues.createLabel({...context.repo, name: label, color: '5319e7', description: 'Scheduled human governance review'}); }
+            const title = `[governance-watch] ${cadence} review ${date}`;
+            const open = await github.paginate(github.rest.issues.listForRepo, {...context.repo, state: 'open', labels: label});
+            if (open.some(issue => issue.title === title)) return;
+            const body = `Run date: ${date}\nCadence: ${cadence}\nSource: scheduled workflow ${context.runId}\n\nHuman review required: ${reviews[cadence]}. Use docs/README.md, docs/governance/RISK_REGISTER.md, and authoritative-source registers. Record owner, source/evidence date, decision, uncertainty, due date and approval. Never infer legal applicability, publish policy/medical content, merge code, or change production from this issue.`;
+            await github.rest.issues.create({...context.repo, title, labels: [label], body});

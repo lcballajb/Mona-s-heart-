@@ -1,7 +1,8 @@
 name: Standards watch
 on:
   schedule:
-    - cron: "31 10 8 * *"
+    - cron: "31 10 8 * *" # monthly source/version check
+    - cron: "41 10 8 1,4,7,10 *" # quarterly migration-strategy review
   workflow_dispatch:
 permissions:
   contents: read
@@ -13,9 +14,14 @@ jobs:
       - uses: actions/github-script@v8
         with:
           script: |
+            const quarterly = context.payload.schedule === '41 10 8 1,4,7,10 *';
+            const cadence = quarterly ? 'quarterly strategy' : 'monthly source';
             const date = new Date().toISOString().slice(0, 10);
-            try { await github.rest.issues.getLabel({...context.repo, name:'standards-watch'}); }
-            catch { await github.rest.issues.createLabel({...context.repo, name:'standards-watch', color:'1d76db', description:'Scheduled human review'}); }
-            const title = `[standards-watch] Review interoperability and terminology ${date.slice(0, 7)}`;
-            const issues = await github.paginate(github.rest.issues.listForRepo, {...context.repo, state:'open', labels:'standards-watch'});
-            if (!issues.some(i => i.title === title)) await github.rest.issues.create({...context.repo, title, labels:['standards-watch'], body:`Checked/reminder date: ${date}\n\nHuman review required: official HL7, SMART, ONC, NLM, CDC, WHO, SNOMED, LOINC and DICOM sources. Record versions, licenses, breaking risk, provenance and migration tests. Never auto-import or publish terminology/medical content.`});
+            const label = 'standards-watch';
+            try { await github.rest.issues.getLabel({...context.repo, name: label}); }
+            catch { await github.rest.issues.createLabel({...context.repo, name: label, color: '1d76db', description: 'Scheduled human standards review'}); }
+            const title = `[standards-watch] ${cadence} review ${date}`;
+            const open = await github.paginate(github.rest.issues.listForRepo, {...context.repo, state: 'open', labels: label});
+            if (open.some(issue => issue.title === title)) return;
+            const body = `Run date: ${date}\nCadence: ${cadence}\n\nHuman review required: official HL7, SMART, ONC, NLM, CDC, WHO, SNOMED, LOINC, DICOM, OAuth/OIDC and platform sources. Record supported/latest versions, licenses, breaking risk, provenance and migration tests. Quarterly, decide dependency/platform strategy. Never auto-import terminology, publish medical content, or merge an upgrade.`;
+            await github.rest.issues.create({...context.repo, title, labels: [label], body});
