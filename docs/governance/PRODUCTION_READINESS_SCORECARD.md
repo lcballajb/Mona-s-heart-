@@ -24,3 +24,13 @@ Statuses: Complete, Partially complete, Missing, Blocked, Requires professional 
 ## Numeric cross-reference
 
 The reproducible repository maturity, security, production, governance, AI, accessibility and technical-debt scores are maintained in [`MASTER_REPOSITORY_AUDIT.md`](MASTER_REPOSITORY_AUDIT.md). This gate table remains the authoritative status view. A numeric score can never override a Blocked or Requires professional review gate.
+
+## Multi-agent architecture gate
+
+**Planned future architecture—requires security, privacy, AI-governance, clinical-safety, legal, and operational review before implementation.**
+
+| Gate                                  | Status                      | Evidence / exit criterion                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Governed multi-agent operating system | Future capability / Blocked | Named accountable humans; approved registry and model/tool/source inventory; threat/privacy/clinical/legal reviews; synthetic adversarial evaluation; least-privilege gateway; audit/cost controls; tested kill switch and rollback; separately approved Phase A sandbox. Planning documents alone do not satisfy this gate. |
+
+No production-readiness score includes an implemented agent system. Every proposed agent is disabled and has no production, user-data, merge, deployment, diagnosis, prescribing, or controlled-publication authority.
