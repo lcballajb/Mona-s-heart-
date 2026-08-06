@@ -1,5 +1,9 @@
 # Roadmap
 
+## Production implementation sequence
+
+Engineering delivery now follows the repository-wide [engineering execution plan](docs/engineering/ENGINEERING_EXECUTION_PLAN.md): runtime/infrastructure, authentication, authorization and database isolation, versioned API completion, audit/observability/testing, then controlled deployment. The current increment centralizes fail-closed API configuration. AI and multi-agent runtimes remain separately gated and disabled until the existing named prerequisites and approvals are satisfied.
+
 ## Prototype hardening
 
 Independent clinical/pharmacy/legal/privacy/security/accessibility review; replace mock terminology through a server proxy; split monolithic UI; complete end-to-end tests.

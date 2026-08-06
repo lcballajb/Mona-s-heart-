@@ -10,36 +10,24 @@ import {
   clientAddress,
 } from "./http-security.mjs";
 import { HealthService } from "./health.mjs";
+import { loadApiConfig } from "./config.mjs";
 
+const config = loadApiConfig();
 const store = await createStore();
 const email = createEmailProvider();
 const rxnorm = new RxNormProvider({
-  enabled: process.env.RXNORM_PROXY_ENABLED === "true",
-  timeoutMs: Number(process.env.RXNORM_TIMEOUT_MS ?? 3000),
+  enabled: config.rxnorm.enabled,
+  timeoutMs: config.rxnorm.timeoutMs,
   cache: new TerminologyCache({
-    ttlMs: Number(process.env.RXNORM_CACHE_TTL_MS ?? 900_000),
-    negativeTtlMs: Number(process.env.RXNORM_NEGATIVE_CACHE_TTL_MS ?? 60_000),
+    ttlMs: config.rxnorm.cacheTtlMs,
+    negativeTtlMs: config.rxnorm.negativeCacheTtlMs,
   }),
 });
 const rateLimiter = createRateLimiter();
 const service = new MonaService(store, email, rateLimiter);
-const production = process.env.NODE_ENV === "production";
-if (
-  production &&
-  (!process.env.DATABASE_URL ||
-    !process.env.SESSION_PEPPER ||
-    !process.env.CORS_ALLOWLIST ||
-    !process.env.TRUSTED_PROXIES)
-)
-  throw new Error(
-    "Production secrets and PostgreSQL configuration are required",
-  );
-const corsAllowlist = (process.env.CORS_ALLOWLIST ?? "http://localhost:5173")
-  .split(",")
-  .filter(Boolean);
-const trustedProxies = (process.env.TRUSTED_PROXIES ?? "")
-  .split(",")
-  .filter(Boolean);
+const production = config.production;
+const corsAllowlist = config.corsAllowlist;
+const trustedProxies = config.trustedProxies;
 const health = new HealthService({
   store,
   email,
@@ -189,7 +177,6 @@ const server = http.createServer(async (request, response) => {
   }
 });
 
-const port = Number(process.env.API_PORT ?? 3001);
-server.listen(port, process.env.API_HOST ?? "127.0.0.1", () =>
-  process.stdout.write(`Mona's Heart API listening on ${port}\n`),
+server.listen(config.port, config.host, () =>
+  process.stdout.write(`Mona's Heart API listening on ${config.port}\n`),
 );

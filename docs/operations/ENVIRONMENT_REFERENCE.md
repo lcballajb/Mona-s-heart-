@@ -2,6 +2,8 @@
 
 `.env.example` is the machine-adjacent inventory; this document classifies ownership and production requirements. Never commit values. `VITE_*` is browser-visible and must not carry secrets.
 
+`server/config.mjs` is the authoritative API startup parser. It validates bounded numeric settings and allowed origins before opening a socket. In production it rejects a non-PostgreSQL adapter, missing or placeholder session/rate-limit secrets, console email, in-memory rate limiting, and an empty trusted-proxy list. Errors name settings but never include their values.
+
 | Group             | Variables                                                                                                   | Production rule                                                                                             |
 | ----------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | Runtime           | `NODE_ENV`, `API_HOST`, `API_PORT`, `PUBLIC_APP_URL`                                                        | Explicit production values; canonical HTTPS URL; bind/network exposure reviewed                             |
