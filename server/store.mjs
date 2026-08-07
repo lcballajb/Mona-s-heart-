@@ -20,6 +20,14 @@ export class MemoryStore {
     this.jobs = [];
     this.exportRequests = [];
     this.deletionRequests = [];
+    this.organizations = [];
+    this.healthEntries = [];
+    this.importedRecords = [];
+    this.notifications = [];
+    this.featureFlags = new Map();
+    this.moderationActions = [];
+    this.contentReviews = [];
+    this.evidenceSources = [];
   }
   now() {
     return this.clock().toISOString();
@@ -284,6 +292,99 @@ export class MemoryStore {
       createdAt: this.now(),
     };
     this.reports.push(row);
+    return row;
+  }
+  upsertProfile(userId, profile) {
+    const row = {
+      userId,
+      displayName: profile.displayName,
+      pronouns: profile.pronouns ?? null,
+      locale: profile.locale ?? "en",
+      updatedAt: this.now(),
+    };
+    this.profiles.set(userId, row);
+    return row;
+  }
+  createHealthEntry(userId, entry) {
+    const row = { id: randomUUID(), userId, ...entry, createdAt: this.now() };
+    this.healthEntries.push(row);
+    return row;
+  }
+  listOwnHealthEntries(userId) {
+    return this.healthEntries.filter((row) => row.userId === userId);
+  }
+  createOrganization(input) {
+    const row = { id: randomUUID(), ...input, createdAt: this.now() };
+    this.organizations.push(row);
+    return row;
+  }
+  addOrganizationMembership(input) {
+    const row = {
+      ...input,
+      status: input.status ?? "pending",
+      approvedBy: input.approvedBy ?? null,
+      createdAt: this.now(),
+    };
+    this.memberships.push(row);
+    return row;
+  }
+  createDocumentMetadata(ownerId, input) {
+    const row = {
+      id: randomUUID(),
+      ownerId,
+      ...input,
+      scanStatus: input.malwareScanStatus ?? "pending",
+      createdAt: this.now(),
+      deletedAt: null,
+    };
+    this.documents.push(row);
+    return row;
+  }
+  getOwnDocument(ownerId, id) {
+    return (
+      this.documents.find(
+        (row) => row.id === id && row.ownerId === ownerId && !row.deletedAt,
+      ) ?? null
+    );
+  }
+  createImportedRecordMetadata(userId, input) {
+    const row = { id: randomUUID(), userId, ...input, createdAt: this.now() };
+    this.importedRecords.push(row);
+    return row;
+  }
+  createNotification(userId, kind, payload = {}) {
+    const row = {
+      id: randomUUID(),
+      userId,
+      kind,
+      payload,
+      createdAt: this.now(),
+    };
+    this.notifications.push(row);
+    return row;
+  }
+  setFeatureFlag(actorId, key, environment, enabled, rules = {}) {
+    const row = { key, environment, enabled, rules, updatedAt: this.now() };
+    this.featureFlags.set(`${key}:${environment}`, row);
+    this.audit("feature_flag_change", actorId, actorId, { key, environment });
+    return row;
+  }
+  recordModerationAction(input) {
+    const row = { id: randomUUID(), ...input, createdAt: this.now() };
+    this.moderationActions.push(row);
+    this.audit("moderation_action", input.moderatorId, null, {
+      reportId: input.reportId,
+    });
+    return row;
+  }
+  recordContentReview(input) {
+    const row = { id: randomUUID(), ...input, createdAt: this.now() };
+    this.contentReviews.push(row);
+    return row;
+  }
+  recordEvidenceSource(input) {
+    const row = { id: randomUUID(), ...input, createdAt: this.now() };
+    this.evidenceSources.push(row);
     return row;
   }
 }
