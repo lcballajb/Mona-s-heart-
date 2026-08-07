@@ -3,6 +3,7 @@ import {
   scrypt as scryptCallback,
   timingSafeEqual,
   createHash,
+  createHmac,
 } from "node:crypto";
 import { promisify } from "node:util";
 
@@ -52,8 +53,10 @@ export async function verifyPassword(password, encoded) {
 export function opaqueToken() {
   return randomBytes(32).toString("base64url");
 }
-export function tokenDigest(token) {
-  return createHash("sha256").update(token).digest("hex");
+export function tokenDigest(token, pepper = "") {
+  if (pepper)
+    return createHmac("sha256", pepper).update(String(token)).digest("hex");
+  return createHash("sha256").update(String(token)).digest("hex");
 }
 export function safeLogId(value, key = "") {
   return createHash("sha256")

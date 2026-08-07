@@ -163,6 +163,18 @@ const server = http.createServer(async (request, response) => {
         },
       );
     }
+    if (request.method === "GET" && path === "/v1/auth/sessions")
+      return reply(response, 200, { sessions: await service.sessions(actor) });
+    if (request.method === "DELETE" && path.startsWith("/v1/auth/sessions/")) {
+      await service.revokeSession(actor, path.split("/").at(-1));
+      return reply(response, 204, {});
+    }
+    if (request.method === "POST" && path === "/v1/auth/password/change")
+      return reply(
+        response,
+        200,
+        await service.changePassword(actor, await body(request)),
+      );
     if (request.method === "POST" && path === "/v1/account/export")
       return reply(response, 202, await service.exportData(actor));
     if (request.method === "DELETE" && path === "/v1/account") {

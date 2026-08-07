@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import { tokenDigest } from "./security.mjs";
 
 export class MemoryStore {
-  constructor(clock = () => new Date()) {
+  constructor(clock = () => new Date(), { sessionPepper = "" } = {}) {
     this.clock = clock;
+    this.sessionPepper = sessionPepper;
     this.users = new Map();
     this.sessions = new Map();
     this.audits = [];
@@ -65,8 +66,9 @@ export class MemoryStore {
     const session = {
       id: randomUUID(),
       userId,
-      digest: tokenDigest(rawToken),
+      digest: tokenDigest(rawToken, this.sessionPepper),
       csrfToken: randomUUID(),
+      createdAt: this.now(),
       expiresAt: new Date(this.clock().getTime() + ttlMs).toISOString(),
       revokedAt: null,
     };
@@ -74,7 +76,7 @@ export class MemoryStore {
     return session;
   }
   session(rawToken) {
-    const found = this.sessions.get(tokenDigest(rawToken));
+    const found = this.sessions.get(tokenDigest(rawToken, this.sessionPepper));
     if (
       !found ||
       found.revokedAt ||
@@ -132,12 +134,25 @@ export class MemoryStore {
     return user;
   }
   revokeSession(rawToken) {
-    const row = this.sessions.get(tokenDigest(rawToken));
+    const row = this.sessions.get(tokenDigest(rawToken, this.sessionPepper));
     if (row) row.revokedAt = this.now();
   }
   revokeUserSessions(id) {
     for (const row of this.sessions.values())
       if (row.userId === id) row.revokedAt = this.now();
+  }
+  listSessions(userId) {
+    return [...this.sessions.values()]
+      .filter((row) => row.userId === userId && !row.revokedAt)
+      .map(({ digest: _digest, csrfToken: _csrfToken, ...row }) => row);
+  }
+  revokeSessionById(userId, sessionId) {
+    const row = [...this.sessions.values()].find(
+      (candidate) => candidate.id === sessionId && candidate.userId === userId,
+    );
+    if (!row) return false;
+    row.revokedAt = this.now();
+    return true;
   }
   approveRole(actorId, userId, role, reason) {
     const user = this.users.get(userId);

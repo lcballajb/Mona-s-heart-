@@ -8,6 +8,7 @@ import {
   requireAnyRole,
 } from "./security.mjs";
 import { renderEmail } from "./email-provider.mjs";
+import { normalizedEmail, objectInput, requiredString } from "./validation.mjs";
 
 const SESSION_MS = 30 * 60 * 1000;
 const TOKEN_MS = 60 * 60 * 1000;
@@ -20,11 +21,14 @@ export class MonaService {
       "unknown account comparison password",
     );
   }
-  async register({ email, password, role = "patient" }) {
-    if (
-      !/^\S+@\S+\.\S+$/.test(email) ||
-      (await this.store.findUserByEmail(email))
-    )
+  async register(input) {
+    const {
+      email: rawEmail,
+      password,
+      role = "patient",
+    } = objectInput(input, ["email", "password", "role"]);
+    const email = normalizedEmail(rawEmail);
+    if (await this.store.findUserByEmail(email))
       throw Object.assign(new Error("Registration unavailable"), {
         statusCode: 400,
       });
@@ -70,7 +74,13 @@ export class MonaService {
     await this.store.audit("email_verification", id, id);
     return user;
   }
-  async signIn({ email, password }) {
+  async signIn(input) {
+    const { email: rawEmail, password } = objectInput(input, [
+      "email",
+      "password",
+    ]);
+    const email = normalizedEmail(rawEmail);
+    requiredString(password, "Password", 200);
     const user = await this.store.findUserByEmail(email);
     const now = this.store.clock().getTime();
     const passwordMatches = await verifyPassword(
@@ -110,7 +120,14 @@ export class MonaService {
     const generic = {
       status: "If the account is eligible, an email will be sent",
     };
-    const user = await this.store.findUserByEmail(String(email ?? ""));
+    let normalized;
+    try {
+      normalized = normalizedEmail(email);
+    } catch {
+      await verifyPassword("comparison password", await this.dummyPasswordHash);
+      return generic;
+    }
+    const user = await this.store.findUserByEmail(normalized);
     if (!user) {
       await verifyPassword("comparison password", await this.dummyPasswordHash);
       return generic;
@@ -161,6 +178,30 @@ export class MonaService {
       await this.store.revokeSession(token);
       await this.store.audit("logout", session.userId, session.userId);
     }
+  }
+  async sessions(actor) {
+    return this.store.listSessions(actor.id);
+  }
+  async revokeSession(actor, sessionId) {
+    if (!(await this.store.revokeSessionById(actor.id, sessionId)))
+      throw Object.assign(new Error("Session not found"), { statusCode: 404 });
+    await this.store.audit("session_revoked", actor.id, actor.id, {
+      sessionId,
+    });
+  }
+  async changePassword(actor, { currentPassword, newPassword }) {
+    if (!(await verifyPassword(currentPassword, actor.passwordHash)))
+      throw Object.assign(new Error("Invalid credentials"), {
+        statusCode: 401,
+      });
+    await this.store.updatePassword(actor.id, await hashPassword(newPassword));
+    await this.store.revokeUserSessions(actor.id);
+    await this.store.audit("password_changed", actor.id, actor.id);
+    await this.emailProvider?.send({
+      to: actor.email,
+      template: renderEmail({ kind: "security_alert" }),
+    });
+    return { status: "password_updated" };
   }
   async actor(token) {
     const session = await this.store.session(token);

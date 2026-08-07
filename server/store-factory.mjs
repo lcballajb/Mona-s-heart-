@@ -9,10 +9,13 @@ export async function createStore(env = process.env) {
     throw new Error(
       "Production requires DATABASE_ADAPTER=postgres; memory fallback is prohibited",
     );
-  if (adapter === "memory") return new MemoryStore();
+  if (adapter === "memory")
+    return new MemoryStore(undefined, { sessionPepper: env.SESSION_PEPPER });
   if (adapter !== "postgres")
     throw new Error(`Unsupported DATABASE_ADAPTER: ${adapter}`);
-  const store = new PostgresStore(createPool(env));
+  const store = new PostgresStore(createPool(env), undefined, {
+    sessionPepper: env.SESSION_PEPPER,
+  });
   try {
     await store.ready();
     return store;

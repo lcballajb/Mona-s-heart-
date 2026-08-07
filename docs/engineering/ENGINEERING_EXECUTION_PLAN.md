@@ -128,4 +128,6 @@ Estimates apply after external decisions: **S** = 1–3 engineer-days, **M** = 1
 
 `E1 configuration → E2 identity → E4 database contract/lifecycle → E3 authorization/RLS → E5 API contract → E10 audit → E11 observability → E12 evidence → E13 deployment`.
 
-The next safe increment is E2 input/session hardening plus HTTP authentication tests. AI and agents must wait for existing gates; infrastructure, identity, database, authorization, audit and testing can proceed without weakening governance.
+E2 input/session hardening is now implemented and recorded in [`MILESTONE_E2_AUTHENTICATION.md`](MILESTONE_E2_AUTHENTICATION.md). MFA selection, production email delivery and independent review remain explicit human/vendor dependencies rather than controls that can be self-approved in this repository.
+
+The next safe increment is E4 store-contract and lifecycle work, followed by E3 tenant isolation. AI and agents must wait for existing gates; infrastructure, identity, database, authorization, audit and testing can proceed without weakening governance.
