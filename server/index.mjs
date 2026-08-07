@@ -11,6 +11,8 @@ import {
 } from "./http-security.mjs";
 import { HealthService } from "./health.mjs";
 import { loadApiConfig } from "./config.mjs";
+import { createShutdown } from "./shutdown.mjs";
+import { createLogger } from "./observability.mjs";
 
 const config = loadApiConfig();
 const store = await createStore();
@@ -34,6 +36,7 @@ const health = new HealthService({
   terminology: rxnorm,
   required: production ? ["database", "email"] : ["database"],
 });
+const logger = createLogger();
 
 function cookies(request) {
   return Object.fromEntries(
@@ -192,3 +195,10 @@ const server = http.createServer(async (request, response) => {
 server.listen(config.port, config.host, () =>
   process.stdout.write(`Mona's Heart API listening on ${config.port}\n`),
 );
+
+const shutdown = createShutdown({ server, resources: [store], logger });
+for (const signal of ["SIGTERM", "SIGINT"])
+  process.once(signal, async () => {
+    const result = await shutdown(signal);
+    process.exitCode = result.ok ? 0 : 1;
+  });
