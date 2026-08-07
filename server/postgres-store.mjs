@@ -20,9 +20,10 @@ const mapUser = (r) =>
     : null;
 
 export class PostgresStore {
-  constructor(pool, clock = () => new Date()) {
+  constructor(pool, clock = () => new Date(), { sessionPepper = "" } = {}) {
     this.pool = pool;
     this.clock = clock;
+    this.sessionPepper = sessionPepper;
   }
   now() {
     return this.clock().toISOString();
@@ -60,7 +61,11 @@ export class PostgresStore {
           "SELECT set_config('app.organization_ids', $1, true)",
           [context.organizationIds.join(",")],
         );
-      const value = await work(new PostgresStore(client, this.clock));
+      const value = await work(
+        new PostgresStore(client, this.clock, {
+          sessionPepper: this.sessionPepper,
+        }),
+      );
       await client.query("COMMIT");
       return value;
     } catch (error) {
@@ -148,7 +153,7 @@ export class PostgresStore {
       `INSERT INTO sessions(user_id,token_digest,csrf_digest,expires_at) VALUES($1,decode($2,'hex'),decode($3,'hex'),$4) RETURNING *`,
       [
         userId,
-        tokenDigest(rawToken),
+        tokenDigest(rawToken, this.sessionPepper),
         tokenDigest(csrfToken),
         new Date(this.clock().getTime() + ttlMs),
       ],
@@ -156,7 +161,7 @@ export class PostgresStore {
     return {
       id: rows[0].id,
       userId,
-      digest: tokenDigest(rawToken),
+      digest: tokenDigest(rawToken, this.sessionPepper),
       csrfToken,
       expiresAt: iso(rows[0].expires_at),
       revokedAt: null,
@@ -172,14 +177,14 @@ export class PostgresStore {
   async session(rawToken) {
     const { rows } = await this.query(
       "SELECT * FROM sessions WHERE token_digest=decode($1,'hex') AND revoked_at IS NULL AND expires_at>now()",
-      [tokenDigest(rawToken ?? "")],
+      [tokenDigest(rawToken ?? "", this.sessionPepper)],
     );
     const r = rows[0];
     return r
       ? {
           id: r.id,
           userId: r.user_id,
-          digest: tokenDigest(rawToken),
+          digest: tokenDigest(rawToken, this.sessionPepper),
           csrfToken: null,
           expiresAt: iso(r.expires_at),
           revokedAt: iso(r.revoked_at),
@@ -196,7 +201,7 @@ export class PostgresStore {
   async revokeSession(rawToken) {
     await this.query(
       "UPDATE sessions SET revoked_at=now() WHERE token_digest=decode($1,'hex')",
-      [tokenDigest(rawToken ?? "")],
+      [tokenDigest(rawToken ?? "", this.sessionPepper)],
     );
   }
   async revokeUserSessions(userId) {
@@ -204,6 +209,26 @@ export class PostgresStore {
       "UPDATE sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL",
       [userId],
     );
+  }
+  async listSessions(userId) {
+    const { rows } = await this.query(
+      "SELECT id,user_id,created_at,expires_at,revoked_at FROM sessions WHERE user_id=$1 AND revoked_at IS NULL ORDER BY created_at DESC",
+      [userId],
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      userId: row.user_id,
+      createdAt: iso(row.created_at),
+      expiresAt: iso(row.expires_at),
+      revokedAt: iso(row.revoked_at),
+    }));
+  }
+  async revokeSessionById(userId, sessionId) {
+    const { rowCount } = await this.query(
+      "UPDATE sessions SET revoked_at=now() WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL",
+      [sessionId, userId],
+    );
+    return rowCount === 1;
   }
   async audit(type, actorId, subjectId, metadata = {}) {
     const { rows } = await this.query(

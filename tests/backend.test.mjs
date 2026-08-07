@@ -223,3 +223,67 @@ test("blocks and reports preserve actor scope", async () => {
   assert.equal(store.reports[0].reporterId, alice.id);
   assert.equal(store.reports[0].status, "open");
 });
+
+test("authentication normalizes identity input and rejects mass assignment", async () => {
+  const { store, service } = await fixture();
+  const registration = await service.register({
+    email: "  CaseSensitive@Example.Test ",
+    password: "correct horse battery staple",
+  });
+  assert.equal(
+    store.users.get(registration.userId).email,
+    "casesensitive@example.test",
+  );
+  await assert.rejects(
+    service.register({
+      email: "second@example.test",
+      password: "correct horse battery staple",
+      status: "active",
+    }),
+    /unsupported fields/,
+  );
+});
+
+test("session digests are peppered and users can revoke only their sessions", async () => {
+  const store = new MemoryStore(undefined, {
+    sessionPepper: "deployment-secret",
+  });
+  const service = new MonaService(store);
+  const alice = await active(service, store, "sessions@example.test");
+  const bob = await active(service, store, "other-sessions@example.test");
+  const login = await service.signIn({
+    email: alice.email,
+    password: "correct horse battery staple",
+  });
+  assert.equal(store.sessions.has(login.token), false);
+  const [session] = await service.sessions(alice);
+  await assert.rejects(service.revokeSession(bob, session.id), /not found/);
+  await service.revokeSession(alice, session.id);
+  assert.equal(await service.actor(login.token), null);
+});
+
+test("password change verifies the credential, revokes sessions, and notifies the user", async () => {
+  const store = new MemoryStore();
+  const messages = [];
+  const service = new MonaService(store, {
+    send: async (message) => messages.push(message),
+  });
+  const user = await active(service, store, "password-change@example.test");
+  const login = await service.signIn({
+    email: user.email,
+    password: "correct horse battery staple",
+  });
+  await assert.rejects(
+    service.changePassword(user, {
+      currentPassword: "incorrect credential",
+      newPassword: "a different correct horse battery staple",
+    }),
+    /Invalid credentials/,
+  );
+  await service.changePassword(user, {
+    currentPassword: "correct horse battery staple",
+    newPassword: "a different correct horse battery staple",
+  });
+  assert.equal(await service.actor(login.token), null);
+  assert.equal(messages.at(-1).template.kind, "security_alert");
+});
