@@ -130,4 +130,4 @@ Estimates apply after external decisions: **S** = 1–3 engineer-days, **M** = 1
 
 E2 input/session hardening is now implemented and recorded in [`MILESTONE_E2_AUTHENTICATION.md`](MILESTONE_E2_AUTHENTICATION.md). MFA selection, production email delivery and independent review remain explicit human/vendor dependencies rather than controls that can be self-approved in this repository.
 
-The next safe increment is E4 store-contract and lifecycle work, followed by E3 tenant isolation. AI and agents must wait for existing gates; infrastructure, identity, database, authorization, audit and testing can proceed without weakening governance.
+The first E4 increment now provides an executable application-operation contract and fills the in-memory adapter's missing operation surface. Return-shape, transaction, concurrency, lifecycle, and failure-semantics contract coverage remain next, followed by E3 tenant isolation. AI and agents must wait for existing gates; infrastructure, identity, database, authorization, audit and testing can proceed without weakening governance.
