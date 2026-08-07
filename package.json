@@ -8,6 +8,7 @@
     "lint:fix": "eslint eslint.config.mjs tests/*.mjs --fix && tsc -b",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,yml,css,html}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,yml,css,html}\"",
+    "audit:repository": "node scripts/repository-audit.mjs",
     "test": "node --test tests/*.test.mjs",
     "test:postgres": "node --test tests/postgres.integration.test.mjs",
     "db:migrate": "node scripts/migrate.mjs",
