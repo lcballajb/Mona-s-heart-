@@ -102,6 +102,12 @@ This inventory is the navigation reference used by the orphan/link check. Inclus
 - [PostgreSQL setup](backend/POSTGRESQL_SETUP.md)
 - [Rate limiting and cache](backend/RATE_LIMITING_AND_CACHE.md)
 - [Worker architecture](backend/WORKER_ARCHITECTURE.md)
+- [Store adapter contract](backend/STORE_ADAPTER_CONTRACT.md)
+
+### engineering
+
+- [Engineering execution plan](engineering/ENGINEERING_EXECUTION_PLAN.md)
+- [E2 authentication hardening milestone](engineering/MILESTONE_E2_AUTHENTICATION.md)
 
 ### communications
 
@@ -176,6 +182,7 @@ This inventory is the navigation reference used by the orphan/link check. Inclus
 - [Observability](operations/OBSERVABILITY.md)
 - [Release management](operations/RELEASE_MANAGEMENT.md)
 - [Repository health audit](operations/REPOSITORY_HEALTH_AUDIT.md)
+- [Post-merge production baseline](operations/POST_MERGE_PRODUCTION_BASELINE.md)
 - [Rollback checklist](operations/ROLLBACK_CHECKLIST.md)
 - [Service shutdown plan](operations/SERVICE_SHUTDOWN_PLAN.md)
 - [Staging deployment](operations/STAGING_DEPLOYMENT.md)

@@ -41,6 +41,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
+      - run: npm run audit:repository
       - run: npm test
       - run: npm run test:postgres
       - run: npm run build
