@@ -111,15 +111,27 @@ export class PostgresStore {
     return mapUser(rows[0]);
   }
   async createAccountToken(userId, purpose, rawToken, ttlMs) {
-    await this.query(
-      "INSERT INTO account_tokens(user_id,purpose,token_digest,expires_at) VALUES($1,$2,decode($3,'hex'),$4)",
-      [
-        userId,
-        purpose,
-        tokenDigest(rawToken),
-        new Date(this.clock().getTime() + ttlMs),
-      ],
-    );
+    await this.transaction(async (tx) => {
+      // Serialize issuance for one account/purpose before taking the UPDATE
+      // snapshot. The partial unique index is a final invariant; the lock also
+      // makes concurrent requests deterministically leave the newest token.
+      await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+        `account_token:${userId}:${purpose}`,
+      ]);
+      await tx.query(
+        "UPDATE account_tokens SET consumed_at=now() WHERE user_id=$1 AND purpose=$2 AND consumed_at IS NULL",
+        [userId, purpose],
+      );
+      await tx.query(
+        "INSERT INTO account_tokens(user_id,purpose,token_digest,expires_at) VALUES($1,$2,decode($3,'hex'),$4)",
+        [
+          userId,
+          purpose,
+          tokenDigest(rawToken),
+          new Date(this.clock().getTime() + ttlMs),
+        ],
+      );
+    });
   }
   async consumeAccountToken(purpose, rawToken) {
     const { rows } = await this.query(

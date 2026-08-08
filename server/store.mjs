@@ -97,6 +97,14 @@ export class MemoryStore {
     return session.csrfToken === rawToken;
   }
   createAccountToken(userId, purpose, rawToken, ttlMs) {
+    const consumedAt = this.now();
+    for (const candidate of this.accountTokens)
+      if (
+        candidate.userId === userId &&
+        candidate.purpose === purpose &&
+        !candidate.consumedAt
+      )
+        candidate.consumedAt = consumedAt;
     this.accountTokens.push({
       userId,
       purpose,

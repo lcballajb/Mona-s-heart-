@@ -11,7 +11,7 @@
 | `GET /v1/terminology/medications?q=`    | None               | No   | Bounded server-side medication lookup; provider/provenance behavior is configuration dependent |
 | `POST /v1/auth/register`                | None               | No   | Register bounded email/password/public role; fictional-data prototype only                     |
 | `POST /v1/auth/verify`                  | Verification token | No   | Complete email verification and invalidate sibling verification tokens                         |
-| `POST /v1/auth/password-reset/request`  | None               | No   | Return an enumeration-resistant response and request a bounded reset email                     |
+| `POST /v1/auth/password-reset/request`  | None               | No   | Return an enumeration-resistant response; issuing a token replaces older reset tokens          |
 | `POST /v1/auth/password-reset/complete` | Reset token        | No   | Change the password, revoke sessions, and invalidate all outstanding reset tokens              |
 | `POST /v1/auth/sign-in`                 | Credentials        | No   | Create HttpOnly, SameSite=Strict session cookie and return CSRF token/expiry                   |
 | `POST /v1/auth/sign-out`                | Session cookie     | Yes  | Revoke current session and clear cookie                                                        |

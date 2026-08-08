@@ -291,3 +291,46 @@ test("completing a password reset invalidates every older reset token", async ()
     /Invalid or expired reset token/,
   );
 });
+
+test("account-token replacement is isolated by account and purpose", () => {
+  const store = new MemoryStore();
+  store.createAccountToken("alice", "password_reset", "alice-old", 60_000);
+  store.createAccountToken("bob", "password_reset", "bob-reset", 60_000);
+  store.createAccountToken(
+    "alice",
+    "email_verification",
+    "alice-verification",
+    60_000,
+  );
+  store.createAccountToken("alice", "password_reset", "alice-new", 60_000);
+
+  assert.equal(store.consumeAccountToken("password_reset", "alice-old"), null);
+  assert.equal(
+    store.consumeAccountToken("email_verification", "alice-verification"),
+    "alice",
+  );
+  assert.equal(store.consumeAccountToken("password_reset", "bob-reset"), "bob");
+  assert.equal(
+    store.consumeAccountToken("password_reset", "alice-new"),
+    "alice",
+  );
+});
+
+test("issuing a new email-verification token prevents replay of its sibling", () => {
+  const store = new MemoryStore();
+  store.createAccountToken("alice", "email_verification", "verify-old", 60_000);
+  store.createAccountToken("alice", "email_verification", "verify-new", 60_000);
+
+  assert.equal(
+    store.consumeAccountToken("email_verification", "verify-old"),
+    null,
+  );
+  assert.equal(
+    store.consumeAccountToken("email_verification", "verify-new"),
+    "alice",
+  );
+  assert.equal(
+    store.consumeAccountToken("email_verification", "verify-new"),
+    null,
+  );
+});

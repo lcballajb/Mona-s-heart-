@@ -75,6 +75,10 @@ test(
         60_000,
       );
       assert.equal(
+        await store.consumeAccountToken("password_reset", "older-reset-token"),
+        null,
+      );
+      assert.equal(
         await store.consumeAccountToken("password_reset", "newer-reset-token"),
         registration.userId,
       );
@@ -82,6 +86,62 @@ test(
         await store.consumeAccountToken("password_reset", "older-reset-token"),
         null,
       );
+      const secondRegistration = await service.register({
+        email: `token-isolation-${suffix}@example.test`,
+        password: "correct horse battery staple",
+      });
+      await store.createAccountToken(
+        registration.userId,
+        "email_verification",
+        "separate-purpose-token",
+        60_000,
+      );
+      await store.createAccountToken(
+        secondRegistration.userId,
+        "password_reset",
+        "separate-user-token",
+        60_000,
+      );
+      assert.equal(
+        await store.consumeAccountToken(
+          "email_verification",
+          "separate-purpose-token",
+        ),
+        registration.userId,
+      );
+      assert.equal(
+        await store.consumeAccountToken(
+          "password_reset",
+          "separate-user-token",
+        ),
+        secondRegistration.userId,
+      );
+      await Promise.all([
+        store.createAccountToken(
+          registration.userId,
+          "password_reset",
+          "concurrent-token-a",
+          60_000,
+        ),
+        store.createAccountToken(
+          registration.userId,
+          "password_reset",
+          "concurrent-token-b",
+          60_000,
+        ),
+      ]);
+      const activeRecoveryTokens = await store.query(
+        "SELECT count(*)::int AS count FROM account_tokens WHERE user_id=$1 AND purpose='password_reset' AND consumed_at IS NULL",
+        [registration.userId],
+      );
+      assert.equal(activeRecoveryTokens.rows[0].count, 1);
+      const concurrentResults = await Promise.all([
+        store.consumeAccountToken("password_reset", "concurrent-token-a"),
+        store.consumeAccountToken("password_reset", "concurrent-token-b"),
+      ]);
+      assert.deepEqual(concurrentResults.filter(Boolean), [
+        registration.userId,
+      ]);
       const login = await service.signIn({
         email: persisted.email,
         password: "correct horse battery staple",
