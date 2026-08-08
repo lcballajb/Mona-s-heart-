@@ -114,7 +114,17 @@ export class MemoryStore {
         Date.parse(t.expiresAt) > this.clock().getTime(),
     );
     if (!row) return null;
-    row.consumedAt = this.now();
+    const consumedAt = this.now();
+    // Completing a credential flow invalidates every outstanding token for the
+    // same account and purpose. Otherwise an older password-reset email could
+    // be replayed after the password had already been changed.
+    for (const candidate of this.accountTokens)
+      if (
+        candidate.userId === row.userId &&
+        candidate.purpose === purpose &&
+        !candidate.consumedAt
+      )
+        candidate.consumedAt = consumedAt;
     return row.userId;
   }
   verifyUser(id) {
