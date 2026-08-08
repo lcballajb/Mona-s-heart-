@@ -334,3 +334,72 @@ test("issuing a new email-verification token prevents replay of its sibling", ()
     null,
   );
 });
+
+test("failed credential operations leave account tokens available for retry", async () => {
+  const { MonaService } = await import("../server/service.mjs");
+  class FailingCredentialStore extends MemoryStore {
+    failVerification = true;
+    failPasswordUpdate = true;
+    failSessionRevocation = false;
+    verifyUser(id) {
+      if (this.failVerification) throw new Error("verification write failed");
+      return super.verifyUser(id);
+    }
+    updatePassword(id, passwordHash) {
+      if (this.failPasswordUpdate) throw new Error("password write failed");
+      return super.updatePassword(id, passwordHash);
+    }
+    revokeUserSessions(id) {
+      super.revokeUserSessions(id);
+      if (this.failSessionRevocation)
+        throw new Error("session revocation failed");
+    }
+  }
+  const store = new FailingCredentialStore();
+  const service = new MonaService(store);
+  const user = store.createUser({
+    email: "retry@example.test",
+    passwordHash: "not-used-by-this-test",
+  });
+  store.createAccountToken(user.id, "email_verification", "verify", 60_000);
+  store.createAccountToken(user.id, "password_reset", "reset", 60_000);
+  const session = store.createSession(user.id, "active-session", 60_000);
+  const originalPasswordHash = user.passwordHash;
+
+  await assert.rejects(service.verifyEmail("verify"), /write failed/);
+  await assert.rejects(
+    service.resetPassword({
+      token: "reset",
+      password: "replacement password is sufficiently long",
+    }),
+    /write failed/,
+  );
+  assert.ok(store.activeAccountToken("email_verification", "verify"));
+  assert.ok(store.activeAccountToken("password_reset", "reset"));
+  assert.equal(user.passwordHash, originalPasswordHash);
+  assert.equal(session.revokedAt, null);
+
+  store.failVerification = false;
+  store.failPasswordUpdate = false;
+  store.failSessionRevocation = true;
+  await assert.rejects(
+    service.resetPassword({
+      token: "reset",
+      password: "replacement password is sufficiently long",
+    }),
+    /session revocation failed/,
+  );
+  assert.ok(store.activeAccountToken("password_reset", "reset"));
+  assert.equal(user.passwordHash, originalPasswordHash);
+  assert.equal(session.revokedAt, null);
+
+  store.failSessionRevocation = false;
+  assert.equal((await service.verifyEmail("verify")).id, user.id);
+  assert.deepEqual(
+    await service.resetPassword({
+      token: "reset",
+      password: "replacement password is sufficiently long",
+    }),
+    { status: "password_updated" },
+  );
+});

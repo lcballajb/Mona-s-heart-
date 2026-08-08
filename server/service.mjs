@@ -62,16 +62,12 @@ export class MonaService {
     return { userId: user.id, verificationToken };
   }
   async verifyEmail(token) {
-    const id = await this.store.consumeAccountToken(
-      "email_verification",
-      token ?? "",
-    );
-    if (!id)
+    const user = await this.store.completeEmailVerification(token ?? "");
+    if (!user)
       throw Object.assign(new Error("Invalid or expired verification token"), {
         statusCode: 400,
       });
-    const user = await this.store.verifyUser(id);
-    await this.store.audit("email_verification", id, id);
+    await this.store.audit("email_verification", user.id, user.id);
     return user;
   }
   async signIn(input) {
@@ -159,16 +155,15 @@ export class MonaService {
     return generic;
   }
   async resetPassword({ token, password }) {
-    const userId = await this.store.consumeAccountToken(
-      "password_reset",
+    const passwordHash = await hashPassword(password);
+    const userId = await this.store.completePasswordReset(
       token ?? "",
+      passwordHash,
     );
     if (!userId)
       throw Object.assign(new Error("Invalid or expired reset token"), {
         statusCode: 400,
       });
-    await this.store.updatePassword(userId, await hashPassword(password));
-    await this.store.revokeUserSessions(userId);
     await this.store.audit("password_reset_completed", userId, userId);
     return { status: "password_updated" };
   }

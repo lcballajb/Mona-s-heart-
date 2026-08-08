@@ -95,6 +95,12 @@ test(
           return { rows: sessionRows };
         return { rows: [] };
       },
+      async connect() {
+        return {
+          query: (text, values) => pool.query(text, values),
+          release() {},
+        };
+      },
     };
     const store = new PostgresStore(pool);
 

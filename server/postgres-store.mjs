@@ -134,23 +134,58 @@ export class PostgresStore {
     });
   }
   async consumeAccountToken(purpose, rawToken) {
-    const { rows } = await this.query(
-      `WITH matched AS (
-         SELECT user_id FROM account_tokens
-         WHERE purpose=$1 AND token_digest=decode($2,'hex')
-           AND consumed_at IS NULL AND expires_at>now()
-         LIMIT 1 FOR UPDATE
-       ), consumed AS (
-         UPDATE account_tokens tokens SET consumed_at=now()
-         FROM matched
-         WHERE tokens.user_id=matched.user_id AND tokens.purpose=$1
-           AND tokens.consumed_at IS NULL
-         RETURNING matched.user_id
-       )
-       SELECT user_id FROM consumed LIMIT 1`,
-      [purpose, tokenDigest(rawToken)],
+    return this.completeAccountToken(purpose, rawToken, async () => {});
+  }
+  async completeEmailVerification(rawToken) {
+    return this.completeAccountToken(
+      "email_verification",
+      rawToken,
+      (tx, userId) => tx.verifyUser(userId),
     );
-    return rows[0]?.user_id ?? null;
+  }
+  async completePasswordReset(rawToken, passwordHash) {
+    return this.completeAccountToken(
+      "password_reset",
+      rawToken,
+      async (tx, userId) => {
+        await tx.updatePassword(userId, passwordHash);
+        await tx.revokeUserSessions(userId);
+        return userId;
+      },
+    );
+  }
+  async completeAccountToken(purpose, rawToken, operation) {
+    const digest = tokenDigest(rawToken);
+    return this.transaction(async (tx) => {
+      // Discover identity without locking a row, then acquire the same advisory
+      // lock used by issuance. Locking the row first would invert lock order and
+      // could deadlock with a concurrent replacement request.
+      const candidate = await tx.query(
+        `SELECT user_id FROM account_tokens
+         WHERE purpose=$1 AND token_digest=decode($2,'hex')
+           AND consumed_at IS NULL AND expires_at>now()`,
+        [purpose, digest],
+      );
+      const userId = candidate.rows[0]?.user_id;
+      if (!userId) return null;
+      await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+        `account_token:${userId}:${purpose}`,
+      ]);
+      const matched = await tx.query(
+        `SELECT 1 FROM account_tokens
+         WHERE user_id=$1 AND purpose=$2 AND token_digest=decode($3,'hex')
+           AND consumed_at IS NULL AND expires_at>now()
+         FOR UPDATE`,
+        [userId, purpose, digest],
+      );
+      if (!matched.rows[0]) return null;
+      const result = await operation(tx, userId);
+      await tx.query(
+        "UPDATE account_tokens SET consumed_at=now() WHERE user_id=$1 AND purpose=$2 AND consumed_at IS NULL",
+        [userId, purpose],
+      );
+      return result ?? userId;
+    });
   }
   async verifyUser(userId) {
     const { rows } = await this.query(

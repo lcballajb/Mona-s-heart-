@@ -62,28 +62,37 @@ test(
         /unavailable/,
       );
       await service.verifyEmail(registration.verificationToken);
+      const recoveryTokens = {
+        older: `older-reset-token-${suffix}`,
+        newer: `newer-reset-token-${suffix}`,
+        otherUser: `separate-user-token-${suffix}`,
+        otherPurpose: `separate-purpose-token-${suffix}`,
+        concurrentA: `concurrent-token-a-${suffix}`,
+        concurrentB: `concurrent-token-b-${suffix}`,
+        rollback: `rollback-token-${suffix}`,
+      };
       await store.createAccountToken(
         registration.userId,
         "password_reset",
-        "older-reset-token",
+        recoveryTokens.older,
         60_000,
       );
       await store.createAccountToken(
         registration.userId,
         "password_reset",
-        "newer-reset-token",
+        recoveryTokens.newer,
         60_000,
       );
       assert.equal(
-        await store.consumeAccountToken("password_reset", "older-reset-token"),
+        await store.consumeAccountToken("password_reset", recoveryTokens.older),
         null,
       );
       assert.equal(
-        await store.consumeAccountToken("password_reset", "newer-reset-token"),
+        await store.consumeAccountToken("password_reset", recoveryTokens.newer),
         registration.userId,
       );
       assert.equal(
-        await store.consumeAccountToken("password_reset", "older-reset-token"),
+        await store.consumeAccountToken("password_reset", recoveryTokens.older),
         null,
       );
       const secondRegistration = await service.register({
@@ -93,26 +102,26 @@ test(
       await store.createAccountToken(
         registration.userId,
         "email_verification",
-        "separate-purpose-token",
+        recoveryTokens.otherPurpose,
         60_000,
       );
       await store.createAccountToken(
         secondRegistration.userId,
         "password_reset",
-        "separate-user-token",
+        recoveryTokens.otherUser,
         60_000,
       );
       assert.equal(
         await store.consumeAccountToken(
           "email_verification",
-          "separate-purpose-token",
+          recoveryTokens.otherPurpose,
         ),
         registration.userId,
       );
       assert.equal(
         await store.consumeAccountToken(
           "password_reset",
-          "separate-user-token",
+          recoveryTokens.otherUser,
         ),
         secondRegistration.userId,
       );
@@ -120,13 +129,13 @@ test(
         store.createAccountToken(
           registration.userId,
           "password_reset",
-          "concurrent-token-a",
+          recoveryTokens.concurrentA,
           60_000,
         ),
         store.createAccountToken(
           registration.userId,
           "password_reset",
-          "concurrent-token-b",
+          recoveryTokens.concurrentB,
           60_000,
         ),
       ]);
@@ -136,12 +145,35 @@ test(
       );
       assert.equal(activeRecoveryTokens.rows[0].count, 1);
       const concurrentResults = await Promise.all([
-        store.consumeAccountToken("password_reset", "concurrent-token-a"),
-        store.consumeAccountToken("password_reset", "concurrent-token-b"),
+        store.consumeAccountToken("password_reset", recoveryTokens.concurrentA),
+        store.consumeAccountToken("password_reset", recoveryTokens.concurrentB),
       ]);
       assert.deepEqual(concurrentResults.filter(Boolean), [
         registration.userId,
       ]);
+      await store.createAccountToken(
+        registration.userId,
+        "password_reset",
+        recoveryTokens.rollback,
+        60_000,
+      );
+      await assert.rejects(
+        store.completeAccountToken(
+          "password_reset",
+          recoveryTokens.rollback,
+          async () => {
+            throw new Error("credential operation failed");
+          },
+        ),
+        /credential operation failed/,
+      );
+      assert.equal(
+        await store.consumeAccountToken(
+          "password_reset",
+          recoveryTokens.rollback,
+        ),
+        registration.userId,
+      );
       const login = await service.signIn({
         email: persisted.email,
         password: "correct horse battery staple",
