@@ -12,7 +12,8 @@ import {
 import { HealthService } from "./health.mjs";
 import { loadApiConfig } from "./config.mjs";
 import { createShutdown } from "./shutdown.mjs";
-import { createLogger } from "./observability.mjs";
+import { createLogger, Observability } from "./observability.mjs";
+import { parseCookies, readJsonBody } from "./http-request.mjs";
 
 const config = loadApiConfig();
 const store = await createStore();
@@ -37,26 +38,7 @@ const health = new HealthService({
   required: production ? ["database", "email"] : ["database"],
 });
 const logger = createLogger();
-
-function cookies(request) {
-  return Object.fromEntries(
-    (request.headers.cookie ?? "")
-      .split(";")
-      .filter(Boolean)
-      .map((part) => part.trim().split("=").map(decodeURIComponent)),
-  );
-}
-async function body(request) {
-  const chunks = [];
-  let bytes = 0;
-  for await (const chunk of request) {
-    bytes += chunk.length;
-    if (bytes > 32_768)
-      throw Object.assign(new Error("Payload too large"), { statusCode: 413 });
-    chunks.push(chunk);
-  }
-  return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
-}
+const observability = new Observability({ logger });
 function reply(response, status, payload, headers = {}) {
   response.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
@@ -67,8 +49,11 @@ function reply(response, status, payload, headers = {}) {
   response.end(JSON.stringify(payload));
 }
 const server = http.createServer(async (request, response) => {
+  const requestId = observability.requestId(request.headers["x-request-id"]);
+  response.setHeader("x-request-id", requestId);
+  let path = "/invalid-request-target";
   try {
-    const path = new URL(request.url, "http://localhost").pathname;
+    path = new URL(request.url, "http://localhost").pathname;
     const origin = request.headers.origin;
     if (!allowedOrigin(origin, corsAllowlist))
       return reply(response, 403, { error: "Origin not allowed" });
@@ -109,20 +94,20 @@ const server = http.createServer(async (request, response) => {
       return reply(response, 200, result);
     }
     if (request.method === "POST" && path === "/v1/auth/register") {
-      await service.register(await body(request));
+      await service.register(await readJsonBody(request));
       return reply(response, 202, { status: "verification_pending" });
     }
     if (request.method === "POST" && path === "/v1/auth/verify")
       return reply(
         response,
         204,
-        await service.verifyEmail((await body(request)).token),
+        await service.verifyEmail((await readJsonBody(request)).token),
       );
     if (request.method === "POST" && path === "/v1/auth/password-reset/request")
       return reply(
         response,
         202,
-        await service.requestPasswordReset(await body(request)),
+        await service.requestPasswordReset(await readJsonBody(request)),
       );
     if (
       request.method === "POST" &&
@@ -131,10 +116,10 @@ const server = http.createServer(async (request, response) => {
       return reply(
         response,
         200,
-        await service.resetPassword(await body(request)),
+        await service.resetPassword(await readJsonBody(request)),
       );
     if (request.method === "POST" && path === "/v1/auth/sign-in") {
-      const result = await service.signIn(await body(request));
+      const result = await service.signIn(await readJsonBody(request));
       return reply(
         response,
         200,
@@ -144,7 +129,7 @@ const server = http.createServer(async (request, response) => {
         },
       );
     }
-    const sessionToken = cookies(request).mh_session;
+    const sessionToken = parseCookies(request.headers.cookie).mh_session;
     const actor = await service.actor(sessionToken);
     if (!actor)
       return reply(response, 401, { error: "Authentication required" });
@@ -176,7 +161,7 @@ const server = http.createServer(async (request, response) => {
       return reply(
         response,
         200,
-        await service.changePassword(actor, await body(request)),
+        await service.changePassword(actor, await readJsonBody(request)),
       );
     if (request.method === "POST" && path === "/v1/account/export")
       return reply(response, 202, await service.exportData(actor));
@@ -186,6 +171,13 @@ const server = http.createServer(async (request, response) => {
     }
     return reply(response, 404, { error: "Not found" });
   } catch (error) {
+    logger.error("http_request_failed", {
+      requestId,
+      method: request.method,
+      path,
+      statusCode: error.statusCode ?? 500,
+      errorType: error.name,
+    });
     reply(response, error.statusCode ?? 500, {
       error: error.statusCode ? error.message : "Internal server error",
     });
