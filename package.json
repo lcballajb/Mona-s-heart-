@@ -19,7 +19,7 @@
     "prepare": "node scripts/prepare.mjs"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "4.3.4",
+    "@vitejs/plugin-react": "6.0.5",
     "lucide-react": "0.468.0",
     "pg": "8.16.3",
     "react": "18.3.1",
