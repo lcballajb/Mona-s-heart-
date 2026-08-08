@@ -97,6 +97,14 @@ export class MemoryStore {
     return session.csrfToken === rawToken;
   }
   createAccountToken(userId, purpose, rawToken, ttlMs) {
+    const consumedAt = this.now();
+    for (const candidate of this.accountTokens)
+      if (
+        candidate.userId === userId &&
+        candidate.purpose === purpose &&
+        !candidate.consumedAt
+      )
+        candidate.consumedAt = consumedAt;
     this.accountTokens.push({
       userId,
       purpose,
@@ -114,8 +122,65 @@ export class MemoryStore {
         Date.parse(t.expiresAt) > this.clock().getTime(),
     );
     if (!row) return null;
-    row.consumedAt = this.now();
+    const consumedAt = this.now();
+    // Completing a credential flow invalidates every outstanding token for the
+    // same account and purpose. Otherwise an older password-reset email could
+    // be replayed after the password had already been changed.
+    for (const candidate of this.accountTokens)
+      if (
+        candidate.userId === row.userId &&
+        candidate.purpose === purpose &&
+        !candidate.consumedAt
+      )
+        candidate.consumedAt = consumedAt;
     return row.userId;
+  }
+  completeEmailVerification(rawToken) {
+    const row = this.activeAccountToken("email_verification", rawToken);
+    if (!row) return null;
+    const user = this.findUserById(row.userId);
+    const previous = user
+      ? { verifiedAt: user.verifiedAt, status: user.status }
+      : null;
+    try {
+      const verified = this.verifyUser(row.userId);
+      this.consumeAccountToken("email_verification", rawToken);
+      return verified;
+    } catch (error) {
+      if (user && previous) Object.assign(user, previous);
+      throw error;
+    }
+  }
+  completePasswordReset(rawToken, passwordHash) {
+    const row = this.activeAccountToken("password_reset", rawToken);
+    if (!row) return null;
+    const user = this.findUserById(row.userId);
+    const previousPassword = user?.passwordHash;
+    const previousSessions = [...this.sessions.values()]
+      .filter((session) => session.userId === row.userId)
+      .map((session) => [session, session.revokedAt]);
+    try {
+      this.updatePassword(row.userId, passwordHash);
+      this.revokeUserSessions(row.userId);
+      this.consumeAccountToken("password_reset", rawToken);
+      return row.userId;
+    } catch (error) {
+      if (user) user.passwordHash = previousPassword;
+      for (const [session, revokedAt] of previousSessions)
+        session.revokedAt = revokedAt;
+      throw error;
+    }
+  }
+  activeAccountToken(purpose, rawToken) {
+    return (
+      this.accountTokens.find(
+        (candidate) =>
+          candidate.purpose === purpose &&
+          candidate.digest === tokenDigest(rawToken) &&
+          !candidate.consumedAt &&
+          Date.parse(candidate.expiresAt) > this.clock().getTime(),
+      ) ?? null
+    );
   }
   verifyUser(id) {
     const user = this.users.get(id);

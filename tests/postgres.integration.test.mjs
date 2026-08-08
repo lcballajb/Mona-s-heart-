@@ -62,6 +62,118 @@ test(
         /unavailable/,
       );
       await service.verifyEmail(registration.verificationToken);
+      const recoveryTokens = {
+        older: `older-reset-token-${suffix}`,
+        newer: `newer-reset-token-${suffix}`,
+        otherUser: `separate-user-token-${suffix}`,
+        otherPurpose: `separate-purpose-token-${suffix}`,
+        concurrentA: `concurrent-token-a-${suffix}`,
+        concurrentB: `concurrent-token-b-${suffix}`,
+        rollback: `rollback-token-${suffix}`,
+      };
+      await store.createAccountToken(
+        registration.userId,
+        "password_reset",
+        recoveryTokens.older,
+        60_000,
+      );
+      await store.createAccountToken(
+        registration.userId,
+        "password_reset",
+        recoveryTokens.newer,
+        60_000,
+      );
+      assert.equal(
+        await store.consumeAccountToken("password_reset", recoveryTokens.older),
+        null,
+      );
+      assert.equal(
+        await store.consumeAccountToken("password_reset", recoveryTokens.newer),
+        registration.userId,
+      );
+      assert.equal(
+        await store.consumeAccountToken("password_reset", recoveryTokens.older),
+        null,
+      );
+      const secondRegistration = await service.register({
+        email: `token-isolation-${suffix}@example.test`,
+        password: "correct horse battery staple",
+      });
+      await store.createAccountToken(
+        registration.userId,
+        "email_verification",
+        recoveryTokens.otherPurpose,
+        60_000,
+      );
+      await store.createAccountToken(
+        secondRegistration.userId,
+        "password_reset",
+        recoveryTokens.otherUser,
+        60_000,
+      );
+      assert.equal(
+        await store.consumeAccountToken(
+          "email_verification",
+          recoveryTokens.otherPurpose,
+        ),
+        registration.userId,
+      );
+      assert.equal(
+        await store.consumeAccountToken(
+          "password_reset",
+          recoveryTokens.otherUser,
+        ),
+        secondRegistration.userId,
+      );
+      await Promise.all([
+        store.createAccountToken(
+          registration.userId,
+          "password_reset",
+          recoveryTokens.concurrentA,
+          60_000,
+        ),
+        store.createAccountToken(
+          registration.userId,
+          "password_reset",
+          recoveryTokens.concurrentB,
+          60_000,
+        ),
+      ]);
+      const activeRecoveryTokens = await store.query(
+        "SELECT count(*)::int AS count FROM account_tokens WHERE user_id=$1 AND purpose='password_reset' AND consumed_at IS NULL",
+        [registration.userId],
+      );
+      assert.equal(activeRecoveryTokens.rows[0].count, 1);
+      const concurrentResults = await Promise.all([
+        store.consumeAccountToken("password_reset", recoveryTokens.concurrentA),
+        store.consumeAccountToken("password_reset", recoveryTokens.concurrentB),
+      ]);
+      assert.deepEqual(concurrentResults.filter(Boolean), [
+        registration.userId,
+      ]);
+      await store.createAccountToken(
+        registration.userId,
+        "password_reset",
+        recoveryTokens.rollback,
+        60_000,
+      );
+      await assert.rejects(
+        store.completeAccountToken(
+          "password_reset",
+          recoveryTokens.rollback,
+          async () => {
+            throw new Error("credential operation failed");
+          },
+        ),
+        /credential operation failed/,
+      );
+      assert.equal(
+        await store.consumeAccountToken(
+          "password_reset",
+          recoveryTokens.rollback,
+        ),
+        registration.userId,
+      );
       const login = await service.signIn({
         email: persisted.email,
         password: "correct horse battery staple",

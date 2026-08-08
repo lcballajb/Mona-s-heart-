@@ -258,3 +258,148 @@ test("password reset is enumeration resistant, throttled, single use, and digest
     3,
   );
 });
+
+test("completing a password reset invalidates every older reset token", async () => {
+  const { MonaService } = await import("../server/service.mjs");
+  const store = new MemoryStore();
+  const email = new TestEmailProvider();
+  const service = new MonaService(store, email);
+  const registration = await service.register({
+    email: "reset-replay@example.test",
+    password: "correct horse battery staple",
+  });
+  await service.verifyEmail(registration.verificationToken);
+  await service.requestPasswordReset({ email: "reset-replay@example.test" });
+  await service.requestPasswordReset({ email: "reset-replay@example.test" });
+  const [older, newer] = email.messages
+    .filter((message) => message.template.kind === "password_reset")
+    .map((message) =>
+      new URL(message.template.text.match(/https:\/\/\S+/)[0]).searchParams.get(
+        "token",
+      ),
+    );
+
+  await service.resetPassword({
+    token: newer,
+    password: "replacement password is sufficiently long",
+  });
+  await assert.rejects(
+    service.resetPassword({
+      token: older,
+      password: "attacker controlled password is long",
+    }),
+    /Invalid or expired reset token/,
+  );
+});
+
+test("account-token replacement is isolated by account and purpose", () => {
+  const store = new MemoryStore();
+  store.createAccountToken("alice", "password_reset", "alice-old", 60_000);
+  store.createAccountToken("bob", "password_reset", "bob-reset", 60_000);
+  store.createAccountToken(
+    "alice",
+    "email_verification",
+    "alice-verification",
+    60_000,
+  );
+  store.createAccountToken("alice", "password_reset", "alice-new", 60_000);
+
+  assert.equal(store.consumeAccountToken("password_reset", "alice-old"), null);
+  assert.equal(
+    store.consumeAccountToken("email_verification", "alice-verification"),
+    "alice",
+  );
+  assert.equal(store.consumeAccountToken("password_reset", "bob-reset"), "bob");
+  assert.equal(
+    store.consumeAccountToken("password_reset", "alice-new"),
+    "alice",
+  );
+});
+
+test("issuing a new email-verification token prevents replay of its sibling", () => {
+  const store = new MemoryStore();
+  store.createAccountToken("alice", "email_verification", "verify-old", 60_000);
+  store.createAccountToken("alice", "email_verification", "verify-new", 60_000);
+
+  assert.equal(
+    store.consumeAccountToken("email_verification", "verify-old"),
+    null,
+  );
+  assert.equal(
+    store.consumeAccountToken("email_verification", "verify-new"),
+    "alice",
+  );
+  assert.equal(
+    store.consumeAccountToken("email_verification", "verify-new"),
+    null,
+  );
+});
+
+test("failed credential operations leave account tokens available for retry", async () => {
+  const { MonaService } = await import("../server/service.mjs");
+  class FailingCredentialStore extends MemoryStore {
+    failVerification = true;
+    failPasswordUpdate = true;
+    failSessionRevocation = false;
+    verifyUser(id) {
+      if (this.failVerification) throw new Error("verification write failed");
+      return super.verifyUser(id);
+    }
+    updatePassword(id, passwordHash) {
+      if (this.failPasswordUpdate) throw new Error("password write failed");
+      return super.updatePassword(id, passwordHash);
+    }
+    revokeUserSessions(id) {
+      super.revokeUserSessions(id);
+      if (this.failSessionRevocation)
+        throw new Error("session revocation failed");
+    }
+  }
+  const store = new FailingCredentialStore();
+  const service = new MonaService(store);
+  const user = store.createUser({
+    email: "retry@example.test",
+    passwordHash: "not-used-by-this-test",
+  });
+  store.createAccountToken(user.id, "email_verification", "verify", 60_000);
+  store.createAccountToken(user.id, "password_reset", "reset", 60_000);
+  const session = store.createSession(user.id, "active-session", 60_000);
+  const originalPasswordHash = user.passwordHash;
+
+  await assert.rejects(service.verifyEmail("verify"), /write failed/);
+  await assert.rejects(
+    service.resetPassword({
+      token: "reset",
+      password: "replacement password is sufficiently long",
+    }),
+    /write failed/,
+  );
+  assert.ok(store.activeAccountToken("email_verification", "verify"));
+  assert.ok(store.activeAccountToken("password_reset", "reset"));
+  assert.equal(user.passwordHash, originalPasswordHash);
+  assert.equal(session.revokedAt, null);
+
+  store.failVerification = false;
+  store.failPasswordUpdate = false;
+  store.failSessionRevocation = true;
+  await assert.rejects(
+    service.resetPassword({
+      token: "reset",
+      password: "replacement password is sufficiently long",
+    }),
+    /session revocation failed/,
+  );
+  assert.ok(store.activeAccountToken("password_reset", "reset"));
+  assert.equal(user.passwordHash, originalPasswordHash);
+  assert.equal(session.revokedAt, null);
+
+  store.failSessionRevocation = false;
+  assert.equal((await service.verifyEmail("verify")).id, user.id);
+  assert.deepEqual(
+    await service.resetPassword({
+      token: "reset",
+      password: "replacement password is sufficiently long",
+    }),
+    { status: "password_updated" },
+  );
+});
