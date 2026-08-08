@@ -183,6 +183,7 @@ This inventory is the navigation reference used by the orphan/link check. Inclus
 - [Release management](operations/RELEASE_MANAGEMENT.md)
 - [Repository health audit](operations/REPOSITORY_HEALTH_AUDIT.md)
 - [Post-merge production baseline](operations/POST_MERGE_PRODUCTION_BASELINE.md)
+- [GitHub reconciliation evidence — 2026-08-08](operations/GITHUB_RECONCILIATION_2026-08-08.md)
 - [Rollback checklist](operations/ROLLBACK_CHECKLIST.md)
 - [Service shutdown plan](operations/SERVICE_SHUTDOWN_PLAN.md)
 - [Staging deployment](operations/STAGING_DEPLOYMENT.md)
