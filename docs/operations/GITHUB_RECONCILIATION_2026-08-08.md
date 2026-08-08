@@ -61,10 +61,15 @@ On Node.js 24.15.0 and npm 11.4.2, formatting, lint/type checking, the structura
 documentation audit, unit tests, and the production build passed. The unit test
 run reported 52 passes and one intentionally skipped PostgreSQL integration
 test. The integration suite still requires a reachable PostgreSQL test service;
-the skipped result is not a pass. The repository audit scanned 291 files and
-also validates local Markdown links and the workflow files' required structure.
-An attempted live production-dependency audit returned HTTP 403 from the npm
-advisory endpoint, so no current vulnerability conclusion is recorded.
+the skipped result is not a pass. On a clean checkout, the repository audit
+scanned exactly 290 files. In the validation sequence below, `npm run lint`
+runs `tsc -b` first and creates the ignored `tsconfig.app.tsbuildinfo`; because
+the audit traverses every file except `.git`, `dist`, and `node_modules`, the
+subsequent audit reproducibly reports 291. The extra file is generated build
+metadata, not a tracked repository file. The audit also validates local
+Markdown links and the workflow files' required structure. An attempted live
+production-dependency audit returned HTTP 403 from the npm advisory endpoint,
+so no current vulnerability conclusion is recorded.
 
 The exact locally executed validation chain was:
 
