@@ -234,6 +234,38 @@ test(
         [actor.id],
       );
       assert.ok(audits.rowCount >= 5);
+
+      const forcedRls = await store.query(
+        `SELECT relname, relrowsecurity, relforcerowsecurity
+           FROM pg_class
+          WHERE relname = ANY($1::text[])
+          ORDER BY relname`,
+        [
+          [
+            "conversations",
+            "documents",
+            "health_entries",
+            "imported_records",
+            "messages",
+            "profiles",
+          ],
+        ],
+      );
+      assert.deepEqual(
+        forcedRls.rows.map((row) => ({
+          table: row.relname,
+          enabled: row.relrowsecurity,
+          forced: row.relforcerowsecurity,
+        })),
+        [
+          { table: "conversations", enabled: true, forced: true },
+          { table: "documents", enabled: true, forced: true },
+          { table: "health_entries", enabled: true, forced: true },
+          { table: "imported_records", enabled: true, forced: true },
+          { table: "messages", enabled: true, forced: true },
+          { table: "profiles", enabled: true, forced: true },
+        ],
+      );
     } finally {
       await store.close();
     }
