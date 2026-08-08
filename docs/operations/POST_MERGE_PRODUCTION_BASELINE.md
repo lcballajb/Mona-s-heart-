@@ -1,7 +1,7 @@
 # Post-merge stabilization and production baseline
 
 **Assessment date:** 2026-08-07  
-**Repository baseline:** `ffc1d2d` (the locally fetched `main` tip)  
+**Repository baseline:** `433c616` (the newest locally available commit)
 **Decision:** **No-Go for production or real health data.** The repository is a
 fictional-data prototype with useful control scaffolding, not evidence of a
 deployed, approved, clinically validated, or compliant service.
@@ -13,7 +13,9 @@ deployment, workflow, test, policy, ADR, governance, AI/agent, accessibility,
 security, privacy, compliance, reliability, and operations material. It also
 reviewed the locally available Git history and merge messages for PRs 1, 2,
 10–13, 15–18, 21, and 23–25. The local `FETCH_HEAD` identifies `ffc1d2d` as the
-last fetched `main`, matching the starting commit.
+last recorded synchronization point; this checkout has no configured remote or
+remote-tracking branch, so its relationship to the current GitHub `main` cannot
+be independently established.
 
 GitHub was unreachable and no authenticated GitHub session or remote-tracking
 refs were available. Consequently, open/closed PR metadata, review comments,
@@ -26,7 +28,12 @@ GitHub UI/API, rebase if necessary, and record comment dispositions in the PR.
 Repository scans found no unresolved merge markers or broken local Markdown
 links. The documentation inventory had omitted three implemented engineering
 documents; this increment indexes them and adds an automated regression gate.
-No source TODO/FIXME/HACK marker requiring implementation was found. `TBD`
+No source TODO/FIXME/HACK marker requiring implementation was found. The HTTP
+boundary audit did find that malformed JSON was incorrectly classified as a
+server error, malformed cookies could escape as internal errors, and the lint
+configuration did not apply to server modules despite naming them on the
+command line. These defects are covered by request-parser regression tests and
+an expanded executable lint scope. `TBD`
 values in governance registers represent explicit human/vendor decisions and
 must not be replaced with invented approvals.
 
@@ -98,8 +105,8 @@ type, build, and test gates provide additional but incomplete evidence.
 
 ## Recommended implementation priority
 
-1. **Now:** enforce repeatable repository integrity checks in CI (this PR), then
-   reconcile current GitHub PR discussions when connectivity is restored.
+1. **Now:** reconcile current GitHub PR discussions and synchronize with `main`
+   when authenticated repository access is restored.
 2. **Next:** extend the E4 store contract with shared behavioral, transaction,
    concurrency, lifecycle, and failure-semantics tests without changing applied
    migrations.
@@ -116,10 +123,9 @@ type, build, and test gates provide additional but incomplete evidence.
 
 ## Significant-change rationale
 
-The new audit command is intentionally dependency-free and read-only. It checks
-all non-generated repository files for byte-identical duplicates and merge
-markers, validates local Markdown targets, and requires every `docs/*.md` file
-to be discoverable from the canonical documentation inventory. It does not
-fetch external URLs, execute content, infer compliance, or mutate files. This
-small baseline capability closes a demonstrated documentation-orphan gap while
-avoiding architecture, runtime, schema, provider, or approval changes.
+This increment is deliberately bounded to HTTP input correctness, safe failure
+logging, request correlation, regression coverage, and making the existing lint
+policy actually inspect every server and script module. It does not alter the
+API surface or production architecture. The repository audit remains
+dependency-free and read-only; it does not fetch external evidence, infer
+compliance, or mutate files.
