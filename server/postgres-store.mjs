@@ -123,7 +123,19 @@ export class PostgresStore {
   }
   async consumeAccountToken(purpose, rawToken) {
     const { rows } = await this.query(
-      `UPDATE account_tokens SET consumed_at=now() WHERE id=(SELECT id FROM account_tokens WHERE purpose=$1 AND token_digest=decode($2,'hex') AND consumed_at IS NULL AND expires_at>now() ORDER BY created_at DESC LIMIT 1 FOR UPDATE) RETURNING user_id`,
+      `WITH matched AS (
+         SELECT user_id FROM account_tokens
+         WHERE purpose=$1 AND token_digest=decode($2,'hex')
+           AND consumed_at IS NULL AND expires_at>now()
+         LIMIT 1 FOR UPDATE
+       ), consumed AS (
+         UPDATE account_tokens tokens SET consumed_at=now()
+         FROM matched
+         WHERE tokens.user_id=matched.user_id AND tokens.purpose=$1
+           AND tokens.consumed_at IS NULL
+         RETURNING matched.user_id
+       )
+       SELECT user_id FROM consumed LIMIT 1`,
       [purpose, tokenDigest(rawToken)],
     );
     return rows[0]?.user_id ?? null;

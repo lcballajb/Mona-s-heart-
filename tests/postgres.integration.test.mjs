@@ -62,6 +62,26 @@ test(
         /unavailable/,
       );
       await service.verifyEmail(registration.verificationToken);
+      await store.createAccountToken(
+        registration.userId,
+        "password_reset",
+        "older-reset-token",
+        60_000,
+      );
+      await store.createAccountToken(
+        registration.userId,
+        "password_reset",
+        "newer-reset-token",
+        60_000,
+      );
+      assert.equal(
+        await store.consumeAccountToken("password_reset", "newer-reset-token"),
+        registration.userId,
+      );
+      assert.equal(
+        await store.consumeAccountToken("password_reset", "older-reset-token"),
+        null,
+      );
       const login = await service.signIn({
         email: persisted.email,
         password: "correct horse battery staple",

@@ -258,3 +258,36 @@ test("password reset is enumeration resistant, throttled, single use, and digest
     3,
   );
 });
+
+test("completing a password reset invalidates every older reset token", async () => {
+  const { MonaService } = await import("../server/service.mjs");
+  const store = new MemoryStore();
+  const email = new TestEmailProvider();
+  const service = new MonaService(store, email);
+  const registration = await service.register({
+    email: "reset-replay@example.test",
+    password: "correct horse battery staple",
+  });
+  await service.verifyEmail(registration.verificationToken);
+  await service.requestPasswordReset({ email: "reset-replay@example.test" });
+  await service.requestPasswordReset({ email: "reset-replay@example.test" });
+  const [older, newer] = email.messages
+    .filter((message) => message.template.kind === "password_reset")
+    .map((message) =>
+      new URL(message.template.text.match(/https:\/\/\S+/)[0]).searchParams.get(
+        "token",
+      ),
+    );
+
+  await service.resetPassword({
+    token: newer,
+    password: "replacement password is sufficiently long",
+  });
+  await assert.rejects(
+    service.resetPassword({
+      token: older,
+      password: "attacker controlled password is long",
+    }),
+    /Invalid or expired reset token/,
+  );
+});
