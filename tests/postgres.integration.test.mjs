@@ -40,6 +40,14 @@ test(
     const store = new PostgresStore(pool);
     const service = new MonaService(store);
     try {
+      const databaseRole = await store.query(
+        `SELECT rolname, rolsuper, rolbypassrls
+           FROM pg_roles
+          WHERE rolname = current_user`,
+      );
+      assert.equal(databaseRole.rows[0]?.rolsuper, false);
+      assert.equal(databaseRole.rows[0]?.rolbypassrls, false);
+
       const suffix = Date.now();
       const registration = await service.register({
         email: `fictional-${suffix}@example.test`,
