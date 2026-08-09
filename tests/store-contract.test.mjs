@@ -47,3 +47,27 @@ test("memory adapter enforces ownership for contract-backed documents", () => {
   assert.equal(store.getOwnDocument("owner", document.id), document);
   assert.equal(store.getOwnDocument("other", document.id), null);
 });
+
+test("PostgreSQL user-scoped operations fail closed on a mismatched transaction", async () => {
+  const contextStore = new PostgresStore(
+    { query: async () => ({ rows: [], rowCount: 0 }) },
+    () => new Date("2026-01-01T00:00:00.000Z"),
+    { rlsContext: { userId: "synthetic-user-a", organizationIds: [] } },
+  );
+
+  assert.deepEqual(
+    await contextStore.listOwnHealthEntries("synthetic-user-a"),
+    [],
+  );
+  await assert.rejects(
+    contextStore.listOwnHealthEntries("synthetic-user-b"),
+    (error) => error.code === "RLS_CONTEXT_MISMATCH",
+  );
+  await assert.rejects(
+    contextStore.createHealthEntry("synthetic-user-b", {
+      kind: "wellness_preference",
+      labelCiphertext: Buffer.from("synthetic encrypted value"),
+    }),
+    (error) => error.code === "RLS_CONTEXT_MISMATCH",
+  );
+});
