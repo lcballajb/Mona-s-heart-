@@ -10,7 +10,7 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,yml,css,html}\"",
     "audit:repository": "node scripts/repository-audit.mjs",
     "test": "node --test tests/*.test.mjs",
-    "test:postgres": "node --test tests/postgres.integration.test.mjs",
+    "test:postgres": "REQUIRE_POSTGRES_SECURITY_TEST=true node --test tests/postgres.integration.test.mjs",
     "db:migrate": "node scripts/migrate.mjs",
     "db:seed": "node scripts/seed.mjs",
     "db:version": "node scripts/migrate.mjs --version",

@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import process from "node:process";
 
 const url = process.env.TEST_DATABASE_URL;
+if (!url && process.env.REQUIRE_POSTGRES_SECURITY_TEST === "true")
+  throw new Error(
+    "TEST_DATABASE_URL is required; the mandatory PostgreSQL security suite cannot be skipped",
+  );
 test(
   "PostgreSQL persistence, isolation, constraints, and rollback",
   { skip: !url },

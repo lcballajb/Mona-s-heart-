@@ -413,7 +413,24 @@ export class MemoryStore {
     );
   }
   createImportedRecordMetadata(userId, input) {
-    const row = { id: randomUUID(), userId, ...input, createdAt: this.now() };
+    if (
+      input.documentId &&
+      !this.documents.some(
+        (document) =>
+          document.id === input.documentId &&
+          document.ownerId === userId &&
+          !document.deletedAt,
+      )
+    )
+      throw new Error("Document unavailable for imported record");
+    const row = {
+      id: randomUUID(),
+      userId,
+      documentId: input.documentId ?? null,
+      source: input.source,
+      payloadCiphertext: input.payloadCiphertext,
+      createdAt: this.now(),
+    };
     this.importedRecords.push(row);
     return row;
   }

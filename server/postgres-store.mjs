@@ -515,11 +515,29 @@ export class PostgresStore {
     return rows[0] ?? null;
   }
   async createImportedRecordMetadata(userId, input) {
-    const { rows } = await this.query(
-      "INSERT INTO imported_records(user_id,document_id,source,payload_ciphertext) VALUES($1,$2,$3,$4) RETURNING *",
-      [userId, input.documentId ?? null, input.source, input.payloadCiphertext],
+    return this.transaction(
+      async (tx) => {
+        const { rows } = await tx.query(
+          `INSERT INTO imported_records(user_id,document_id,source,payload_ciphertext)
+           SELECT $1,$2,$3,$4
+           WHERE $2::uuid IS NULL OR EXISTS (
+             SELECT 1 FROM documents
+              WHERE id=$2 AND owner_id=$1 AND deleted_at IS NULL
+           )
+           RETURNING *`,
+          [
+            userId,
+            input.documentId ?? null,
+            input.source,
+            input.payloadCiphertext,
+          ],
+        );
+        if (!rows[0])
+          throw new Error("Document unavailable for imported record");
+        return rows[0];
+      },
+      { userId },
     );
-    return rows[0];
   }
   async createNotification(userId, kind, payload = {}) {
     const { rows } = await this.query(
