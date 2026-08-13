@@ -108,6 +108,7 @@ This inventory is the navigation reference used by the orphan/link check. Inclus
 
 - [Engineering execution plan](engineering/ENGINEERING_EXECUTION_PLAN.md)
 - [E2 authentication hardening milestone](engineering/MILESTONE_E2_AUTHENTICATION.md)
+- [Step 1 repository inventory](engineering/STEP_1_REPOSITORY_INVENTORY.md)
 
 ### communications
 
