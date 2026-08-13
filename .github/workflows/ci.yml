@@ -17,13 +17,13 @@ jobs:
         image: postgres:16-alpine
         env:
           {
-            POSTGRES_USER: mona_test,
-            POSTGRES_PASSWORD: test_only_password,
-            POSTGRES_DB: mona_test,
+            POSTGRES_USER: mona_admin,
+            POSTGRES_PASSWORD: test_only_admin_password,
+            POSTGRES_DB: postgres,
           }
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U mona_test" --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd "pg_isready -U mona_admin -d postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       DATABASE_URL: postgresql://mona_test:test_only_password@localhost:5432/mona_test
       TEST_DATABASE_URL: postgresql://mona_test:test_only_password@localhost:5432/mona_test
@@ -35,6 +35,13 @@ jobs:
       - uses: actions/setup-node@v5
         with: { node-version: 24, cache: npm }
       - run: npm ci
+      - name: Create non-superuser PostgreSQL test database
+        env:
+          PGPASSWORD: test_only_admin_password
+        run: |
+          psql --host localhost --username mona_admin --dbname postgres --set ON_ERROR_STOP=1 \
+            --command "CREATE ROLE mona_test LOGIN PASSWORD 'test_only_password' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS"
+          createdb --host localhost --username mona_admin --owner mona_test mona_test
       - run: npm run db:migrate
       - run: npm run db:seed
       - run: npm run db:seed

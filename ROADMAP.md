@@ -2,7 +2,7 @@
 
 ## Production implementation sequence
 
-Engineering delivery now follows the repository-wide [engineering execution plan](docs/engineering/ENGINEERING_EXECUTION_PLAN.md): runtime/infrastructure, authentication, authorization and database isolation, versioned API completion, audit/observability/testing, then controlled deployment. The current increment centralizes fail-closed API configuration. AI and multi-agent runtimes remain separately gated and disabled until the existing named prerequisites and approvals are satisfied.
+Engineering delivery now follows the repository-wide [engineering execution plan](docs/engineering/ENGINEERING_EXECUTION_PLAN.md): runtime/infrastructure, authentication, authorization and database isolation, versioned API completion, audit/observability/testing, then controlled deployment. The current increment binds every application operation on user-owned PostgreSQL profiles, health entries, documents, and imported records to a transaction-local user context and rejects cross-context reuse. AI and multi-agent runtimes remain separately gated and disabled until the existing named prerequisites and approvals are satisfied.
 
 ## Prototype hardening
 
