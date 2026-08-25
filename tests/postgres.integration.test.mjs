@@ -68,15 +68,21 @@ test(
       const roleNames = {
         bypass: `mona_test_bypass_${securitySuffix}`,
         privileged: `mona_test_admin_${securitySuffix}`,
+        replication: `mona_test_replication_${securitySuffix}`,
         schemaCreator: `mona_test_schema_${securitySuffix}`,
         tableOwner: `mona_test_owner_${securitySuffix}`,
       };
       const unsafeRoles = [
         [roleNames.bypass, "BYPASSRLS"],
         [roleNames.privileged, "CREATEDB CREATEROLE"],
+        [roleNames.replication, "REPLICATION"],
         [roleNames.schemaCreator, ""],
         [roleNames.tableOwner, ""],
       ];
+      const databaseName = (
+        await admin.query("SELECT current_database() AS name")
+      ).rows[0].name;
+      const quotedDatabaseName = `"${databaseName.replaceAll('"', '""')}"`;
       const roleUrl = (role) => {
         const parsed = new URL(url);
         parsed.username = role;
@@ -105,7 +111,9 @@ test(
         );
         if (attributes)
           await admin.query(`ALTER ROLE ${role} WITH ${attributes}`);
-        await admin.query(`GRANT CONNECT ON DATABASE mona_test TO ${role}`);
+        await admin.query(
+          `GRANT CONNECT ON DATABASE ${quotedDatabaseName} TO ${role}`,
+        );
         await admin.query(`GRANT USAGE ON SCHEMA public TO ${role}`);
       }
 
@@ -123,6 +131,21 @@ test(
       }
       await attestUnsafeRole(roleNames.bypass);
       await attestUnsafeRole(roleNames.privileged);
+      await attestUnsafeRole(roleNames.replication);
+
+      await admin.query(`GRANT ${roleNames.bypass} TO ${roleNames.tableOwner}`);
+      await attestUnsafeRole(roleNames.tableOwner);
+      await admin.query(
+        `REVOKE ${roleNames.bypass} FROM ${roleNames.tableOwner}`,
+      );
+
+      await admin.query(
+        `GRANT CREATE ON DATABASE ${quotedDatabaseName} TO ${roleNames.schemaCreator}`,
+      );
+      await attestUnsafeRole(roleNames.schemaCreator);
+      await admin.query(
+        `REVOKE CREATE ON DATABASE ${quotedDatabaseName} FROM ${roleNames.schemaCreator}`,
+      );
 
       await admin.query(
         `GRANT CREATE ON SCHEMA public TO ${roleNames.schemaCreator}`,
@@ -133,10 +156,32 @@ test(
       );
 
       await admin.query(
+        `GRANT TRUNCATE ON notifications TO ${roleNames.schemaCreator}`,
+      );
+      await attestUnsafeRole(roleNames.schemaCreator);
+      await admin.query(
+        `REVOKE TRUNCATE ON notifications FROM ${roleNames.schemaCreator}`,
+      );
+
+      await admin.query(
         `ALTER TABLE profiles OWNER TO ${roleNames.tableOwner}`,
       );
       await attestUnsafeRole(roleNames.tableOwner);
       await admin.query("ALTER TABLE profiles OWNER TO mona_admin");
+
+      await admin.query(
+        "ALTER TABLE organization_memberships DISABLE ROW LEVEL SECURITY",
+      );
+      await assert.rejects(
+        attestRuntimeRole(pool, { expectedRole: process.env.DB_RUNTIME_USER }),
+        /runtime role attestation failed/,
+      );
+      await admin.query(
+        "ALTER TABLE organization_memberships ENABLE ROW LEVEL SECURITY",
+      );
+      await admin.query(
+        "ALTER TABLE organization_memberships FORCE ROW LEVEL SECURITY",
+      );
 
       const suffix = Date.now();
       const registration = await service.register({

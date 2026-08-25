@@ -13,6 +13,7 @@ export const PROTECTED_RLS_TABLES = Object.freeze([
   "imported_records",
   "messages",
   "notifications",
+  "organization_memberships",
   "profiles",
 ]);
 
@@ -71,22 +72,43 @@ export async function attestRuntimeRole(
     client = await pool.connect();
     const { rows } = await client.query(
       `WITH role_state AS (
-         SELECT oid, rolsuper, rolbypassrls, rolcreaterole, rolcreatedb
+         SELECT oid, rolsuper, rolbypassrls, rolcreaterole, rolcreatedb,
+                rolreplication
            FROM pg_roles
           WHERE rolname = current_user
        ), protected_tables AS (
          SELECT count(c.oid)::int AS protected_table_count,
+                count(c.oid) FILTER (
+                  WHERE c.relrowsecurity AND c.relforcerowsecurity
+                )::int AS forced_rls_table_count,
                 count(c.oid) FILTER (WHERE c.relowner = r.oid)::int AS owned_protected_tables,
                 count(c.oid) FILTER (
                   WHERE c.relowner <> r.oid
                     AND pg_has_role(current_user, c.relowner, 'MEMBER')
-                )::int AS member_owned_protected_tables
+                )::int AS member_owned_protected_tables,
+                count(c.oid) FILTER (
+                  WHERE has_table_privilege(current_user, c.oid, 'TRUNCATE')
+                )::int AS truncatable_protected_tables
            FROM role_state r
            LEFT JOIN pg_class c
              ON c.relnamespace = 'public'::regnamespace
             AND c.relkind IN ('r', 'p')
             AND c.relname = ANY($1::text[])
           GROUP BY r.oid
+       ), unsafe_memberships AS (
+         SELECT count(*)::int AS unsafe_role_count
+           FROM pg_roles candidate
+          WHERE candidate.oid <> (SELECT oid FROM role_state)
+            AND pg_has_role(current_user, candidate.oid, 'MEMBER')
+            AND (
+              candidate.rolsuper OR candidate.rolbypassrls OR
+              candidate.rolcreaterole OR candidate.rolcreatedb OR
+              candidate.rolreplication OR
+              candidate.rolname = ANY(ARRAY[
+                'pg_read_server_files', 'pg_write_server_files',
+                'pg_execute_server_program'
+              ])
+            )
        )
        SELECT current_user AS current_role,
               session_user AS session_role,
@@ -94,12 +116,19 @@ export async function attestRuntimeRole(
               r.rolbypassrls,
               r.rolcreaterole,
               r.rolcreatedb,
+              r.rolreplication,
               current_setting('row_security') <> 'off' AS row_security_enabled,
               has_schema_privilege(current_user, 'public', 'CREATE') AS can_create_in_public,
+              has_database_privilege(current_user, current_database(), 'CREATE') AS can_create_in_database,
               p.protected_table_count,
+              p.forced_rls_table_count,
               p.owned_protected_tables,
-              p.member_owned_protected_tables
-         FROM role_state r CROSS JOIN protected_tables p`,
+              p.member_owned_protected_tables,
+              p.truncatable_protected_tables,
+              u.unsafe_role_count
+         FROM role_state r
+         CROSS JOIN protected_tables p
+         CROSS JOIN unsafe_memberships u`,
       [PROTECTED_RLS_TABLES],
     );
     const role = rows[0];
@@ -111,11 +140,16 @@ export async function attestRuntimeRole(
       role.rolbypassrls === false &&
       role.rolcreaterole === false &&
       role.rolcreatedb === false &&
+      role.rolreplication === false &&
       role.row_security_enabled === true &&
       role.can_create_in_public === false &&
+      role.can_create_in_database === false &&
       role.protected_table_count === PROTECTED_RLS_TABLES.length &&
+      role.forced_rls_table_count === PROTECTED_RLS_TABLES.length &&
       role.owned_protected_tables === 0 &&
-      role.member_owned_protected_tables === 0;
+      role.member_owned_protected_tables === 0 &&
+      role.truncatable_protected_tables === 0 &&
+      role.unsafe_role_count === 0;
     if (!safe) throw new Error(ATTESTATION_ERROR);
     return true;
   } catch {

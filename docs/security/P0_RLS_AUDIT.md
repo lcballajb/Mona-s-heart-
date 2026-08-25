@@ -55,10 +55,11 @@ distinct identities, false role capability flags, no table/schema ownership,
 DDL denial, and FORCE-RLS bypass denial.
 
 Runtime startup now fails closed unless the effective and session roles match
-`DB_RUNTIME_USER` and catalog evidence proves the role is not a superuser, does
-not have `BYPASSRLS`, `CREATEDB`, or `CREATEROLE`, cannot create objects in the
-application schema, and neither owns nor can assume ownership of every
-protected RLS table. The query runs through the ordinary application pool and
+`DB_RUNTIME_USER` and catalog evidence proves the role and its assumable roles
+have no privileged attributes, cannot create objects in the database or
+application schema, and neither owns nor can truncate any protected RLS table.
+The protected inventory must remain complete with forced RLS enabled.
+The query runs through the ordinary application pool and
 returns only a generic failure. Real PostgreSQL 16 tests cover the accepted
 role plus superuser, bypass-RLS, role/database creator, schema creator,
 protected-table owner, unexpected identity, missing identity, and
