@@ -1,5 +1,5 @@
 import { MemoryStore } from "./store.mjs";
-import { createPool } from "./database.mjs";
+import { attestRuntimeRole, createPool } from "./database.mjs";
 import { PostgresStore } from "./postgres-store.mjs";
 import { assertStoreContract } from "./store-contract.mjs";
 
@@ -16,10 +16,12 @@ export async function createStore(env = process.env) {
     );
   if (adapter !== "postgres")
     throw new Error(`Unsupported DATABASE_ADAPTER: ${adapter}`);
-  const store = new PostgresStore(createPool(env), undefined, {
+  const pool = createPool(env);
+  const store = new PostgresStore(pool, undefined, {
     sessionPepper: env.SESSION_PEPPER,
   });
   try {
+    await attestRuntimeRole(pool, { expectedRole: env.DB_RUNTIME_USER });
     await store.ready();
     return assertStoreContract(store);
   } catch {

@@ -1,16 +1,17 @@
 # P0 authenticated actor and RLS audit
 
-Date: 2026-08-25. Baseline: `f8cdaea` (PR #46 head before remediation).
+Date: 2026-08-25. Baseline: PR #46 plus runtime database-role attestation.
 
 ## Audit findings
 
 The HTTP layer resolves a session token to an actor before protected account
 routes call the service. Service methods generally derive user ownership from
-`actor.id`. PostgreSQL actor settings are transaction-local. However, many
-the four reachable consent/notification/export/deletion store operations now
-execute in actor-context transactions. CI independently provisions and tests a
-restricted runtime login. Broader inventory gaps listed below remain outside
-this remediation, so the repository-wide architecture is **not P0 verified**.
+`actor.id`. PostgreSQL actor settings are transaction-local. The four reachable
+consent/notification/export/deletion store operations execute in actor-context
+transactions. CI independently provisions and tests a restricted runtime
+login. API and worker store creation now attest that same runtime connection
+before accepting work. Broader inventory gaps listed below remain outside this
+remediation, so the repository-wide architecture is **not P0 verified**.
 
 ## Actor-context inventory
 
@@ -53,6 +54,16 @@ restricted `DATABASE_URL`/`TEST_DATABASE_URL`. PostgreSQL 16 execution verified
 distinct identities, false role capability flags, no table/schema ownership,
 DDL denial, and FORCE-RLS bypass denial.
 
+Runtime startup now fails closed unless the effective and session roles match
+`DB_RUNTIME_USER` and catalog evidence proves the role is not a superuser, does
+not have `BYPASSRLS`, `CREATEDB`, or `CREATEROLE`, cannot create objects in the
+application schema, and neither owns nor can assume ownership of every
+protected RLS table. The query runs through the ordinary application pool and
+returns only a generic failure. Real PostgreSQL 16 tests cover the accepted
+role plus superuser, bypass-RLS, role/database creator, schema creator,
+protected-table owner, unexpected identity, missing identity, and
+unverifiable-connection rejection.
+
 ## Required adversarial matrix and gaps
 
 | Case                                                  | Result                                                                    |
@@ -63,6 +74,8 @@ DDL denial, and FORCE-RLS bypass denial.
 | No actor context                                      | PASS — owned writes fail closed                                           |
 | Runtime role bypasses RLS                             | PASS — `row_security=off` cannot bypass forced policy                     |
 | Runtime role modifies schema                          | PASS — runtime `CREATE TABLE` is denied                                   |
+| Runtime startup with privileged or unexpected role    | PASS — attestation rejects each tested unsafe identity                    |
+| Runtime role owns or can assume a protected owner     | PASS — attestation rejects protected-table ownership                      |
 | Same-user operations                                  | PASS — mandatory PostgreSQL matrix executed                               |
 
 The dedicated PostgreSQL command fails rather than silently skipping when
@@ -72,8 +85,8 @@ through the restricted runtime credential.
 
 ## P0 vulnerabilities and required fixes
 
-The requested PR #46 actor-context, credential-separation, runtime-role, and
-adversarial-test controls are verified by a real PostgreSQL 16 execution with
+The PR #46 actor-context and credential-separation controls plus runtime
+startup role attestation are verified by a real PostgreSQL 16 execution with
 zero skipped mandatory tests. Remaining repository-wide work is:
 
 1. Put other user-owned store operations identified as PARTIAL above in actor-context transactions before exposing them through new routes.
