@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Create daily human-review issue
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const date = new Date().toISOString().slice(0, 10);
@@ -50,7 +50,7 @@ jobs:
           retention-days: 30
       - name: Create weekly review issue
         if: always()
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const date = new Date().toISOString().slice(0, 10);
