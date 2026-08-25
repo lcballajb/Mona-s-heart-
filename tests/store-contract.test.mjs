@@ -47,3 +47,46 @@ test("memory adapter enforces ownership for contract-backed documents", () => {
   assert.equal(store.getOwnDocument("owner", document.id), document);
   assert.equal(store.getOwnDocument("other", document.id), null);
 });
+
+test("imported metadata cannot reference another owner's deleted or inaccessible document", () => {
+  const store = new MemoryStore();
+  const document = store.createDocumentMetadata("user-b", {
+    objectId: "object-b",
+  });
+
+  assert.throws(
+    () =>
+      store.createImportedRecordMetadata("user-a", {
+        documentId: document.id,
+        source: "upload",
+        payloadCiphertext: Buffer.from("encrypted"),
+        userId: "user-b",
+        ownerId: "user-b",
+      }),
+    /unavailable/,
+  );
+  assert.equal(store.importedRecords.length, 0);
+
+  const own = store.createDocumentMetadata("user-a", { objectId: "object-a" });
+  const imported = store.createImportedRecordMetadata("user-a", {
+    documentId: own.id,
+    source: "upload",
+    payloadCiphertext: Buffer.from("encrypted"),
+    userId: "user-b",
+    ownerId: "user-b",
+  });
+  assert.equal(imported.userId, "user-a");
+  assert.equal(imported.ownerId, undefined);
+
+  own.deletedAt = new Date().toISOString();
+  assert.throws(
+    () =>
+      store.createImportedRecordMetadata("user-a", {
+        documentId: own.id,
+        source: "upload",
+        payloadCiphertext: Buffer.from("encrypted"),
+      }),
+    /unavailable/,
+  );
+  assert.equal(store.importedRecords.length, 1);
+});

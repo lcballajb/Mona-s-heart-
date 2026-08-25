@@ -17,16 +17,20 @@ jobs:
         image: postgres:16-alpine
         env:
           {
-            POSTGRES_USER: mona_test,
+            POSTGRES_USER: mona_admin,
             POSTGRES_PASSWORD: test_only_password,
             POSTGRES_DB: mona_test,
           }
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U mona_test" --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd "pg_isready -U mona_admin" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      DATABASE_URL: postgresql://mona_test:test_only_password@localhost:5432/mona_test
-      TEST_DATABASE_URL: postgresql://mona_test:test_only_password@localhost:5432/mona_test
+      DB_ADMIN_URL: postgresql://mona_admin:test_only_password@localhost:5432/mona_test
+      DATABASE_URL: postgresql://mona_runtime:runtime_only_password@localhost:5432/mona_test
+      TEST_DATABASE_URL: postgresql://mona_runtime:runtime_only_password@localhost:5432/mona_test
+      DB_RUNTIME_USER: mona_runtime
+      DB_RUNTIME_PASSWORD: runtime_only_password
+      REQUIRE_POSTGRES_SECURITY_TEST: "true"
       DATABASE_ADAPTER: postgres
       DATABASE_SSL: "false"
       NODE_ENV: test
@@ -38,6 +42,7 @@ jobs:
       - run: npm run db:migrate
       - run: npm run db:seed
       - run: npm run db:seed
+      - run: npm run db:provision-runtime
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check

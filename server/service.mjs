@@ -247,8 +247,7 @@ export class MonaService {
     return { organizationId };
   }
   async recordConsent(actor, purpose, version, details = {}) {
-    const row = await this.store.recordConsent({
-      userId: actor.id,
+    const row = await this.store.recordConsent(actor.id, {
       purpose,
       version,
       granted: true,
@@ -265,8 +264,7 @@ export class MonaService {
     return row;
   }
   async withdrawConsent(actor, purpose, version = "current", details = {}) {
-    const row = await this.store.recordConsent({
-      userId: actor.id,
+    const row = await this.store.recordConsent(actor.id, {
       purpose,
       version,
       granted: false,
@@ -284,6 +282,9 @@ export class MonaService {
   }
   async exportData(actor) {
     return this.store.createExportRequest(actor.id);
+  }
+  async createNotification(actor, kind, payload = {}) {
+    return this.store.createNotification(actor.id, kind, payload);
   }
   async deleteAccount(actor) {
     return this.store.createDeletionRequest(actor.id);

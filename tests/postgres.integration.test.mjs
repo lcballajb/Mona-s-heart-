@@ -3,42 +3,41 @@ import assert from "node:assert/strict";
 import process from "node:process";
 
 const url = process.env.TEST_DATABASE_URL;
+const adminUrl = process.env.DB_ADMIN_URL;
+if (
+  (!url || !adminUrl) &&
+  process.env.REQUIRE_POSTGRES_SECURITY_TEST === "true"
+)
+  throw new Error(
+    "TEST_DATABASE_URL and DB_ADMIN_URL are required; the mandatory PostgreSQL security suite cannot be skipped",
+  );
 test(
   "PostgreSQL persistence, isolation, constraints, and rollback",
   { skip: !url },
   async () => {
-    if (!url || /production/i.test(url))
+    if (!url || !adminUrl || /production/i.test(url))
       throw new Error("Disposable TEST_DATABASE_URL required");
     process.env.DATABASE_URL = url;
     process.env.NODE_ENV = "test";
     process.env.DATABASE_SSL = "false";
-    const { execFileSync } = await import("node:child_process");
-    execFileSync(process.execPath, ["scripts/migrate.mjs"], {
-      env: process.env,
-      stdio: "inherit",
-    });
-    execFileSync(process.execPath, ["scripts/seed.mjs"], {
-      env: process.env,
-      stdio: "inherit",
-    });
-    execFileSync(process.execPath, ["scripts/seed.mjs"], {
-      env: process.env,
-      stdio: "inherit",
-    });
     const [
       { createPool },
       { PostgresStore },
       { MonaService },
       { verifyPassword },
+      { Client },
     ] = await Promise.all([
       import("../server/database.mjs"),
       import("../server/postgres-store.mjs"),
       import("../server/service.mjs"),
       import("../server/security.mjs"),
+      import("pg"),
     ]);
     const pool = createPool();
     const store = new PostgresStore(pool);
     const service = new MonaService(store);
+    const admin = new Client({ connectionString: adminUrl, ssl: false });
+    await admin.connect();
     try {
       const suffix = Date.now();
       const registration = await service.register({
@@ -182,9 +181,69 @@ test(
       await service.signOut(login.token);
       assert.equal(await store.session(login.token), null);
       const actor = await store.findUserById(registration.userId);
+      const otherActor = await store.findUserById(secondRegistration.userId);
+
+      const identity = await store.query(
+        `SELECT current_user, session_user,
+                rolsuper, rolcreatedb, rolcreaterole, rolinherit,
+                rolreplication, rolbypassrls
+           FROM pg_roles WHERE rolname = current_user`,
+      );
+      assert.equal(identity.rows[0].current_user, process.env.DB_RUNTIME_USER);
+      assert.equal(identity.rows[0].session_user, process.env.DB_RUNTIME_USER);
+      for (const attribute of [
+        "rolsuper",
+        "rolcreatedb",
+        "rolcreaterole",
+        "rolinherit",
+        "rolreplication",
+        "rolbypassrls",
+      ])
+        assert.equal(identity.rows[0][attribute], false, attribute);
+      const adminIdentity = await admin.query(
+        "SELECT current_user, session_user",
+      );
+      assert.notEqual(
+        adminIdentity.rows[0].current_user,
+        identity.rows[0].current_user,
+      );
+      assert.notEqual(
+        adminIdentity.rows[0].session_user,
+        identity.rows[0].session_user,
+      );
+      const ownership = await admin.query(
+        `SELECT
+           count(*) FILTER (WHERE c.relowner = r.oid)::int AS owned_tables,
+           (SELECT n.nspowner = r.oid FROM pg_namespace n WHERE n.nspname='public') AS owns_schema
+         FROM pg_roles r
+         LEFT JOIN pg_class c ON c.relnamespace = 'public'::regnamespace
+                              AND c.relkind IN ('r','p')
+        WHERE r.rolname=$1
+        GROUP BY r.oid`,
+        [process.env.DB_RUNTIME_USER],
+      );
+      assert.equal(ownership.rows[0].owned_tables, 0);
+      assert.equal(ownership.rows[0].owns_schema, false);
+      await assert.rejects(
+        store.query(`CREATE TABLE runtime_ddl_denied(id int)`),
+      );
+
+      const inActorContext = (userId, sql, values = []) =>
+        store.transaction((tx) => tx.query(sql, values), { userId });
+      const consentInput = {
+        purpose: "health_data_processing",
+        version: "2026-01",
+        granted: true,
+        withdrawnAt: null,
+        sourceInterface: "web",
+        region: "unspecified",
+        language: "en",
+        organizationId: null,
+      };
       await service.recordConsent(actor, "health_data_processing", "2026-01");
       await service.withdrawConsent(actor, "health_data_processing", "2026-01");
-      const consents = await store.query(
+      const consents = await inActorContext(
+        actor.id,
         "SELECT granted FROM consent_records WHERE user_id=$1 ORDER BY granted_at",
         [actor.id],
       );
@@ -192,11 +251,188 @@ test(
         consents.rows.map((r) => r.granted),
         [true, false],
       );
-      await service.exportData(actor);
-      await service.deleteAccount(actor);
+      await assert.rejects(
+        inActorContext(
+          actor.id,
+          `INSERT INTO consent_records(user_id,purpose,policy_version,granted,granted_at,capture_method,region,language)
+           VALUES($1,$2,$3,true,now(),'web','unspecified','en')`,
+          [otherActor.id, consentInput.purpose, consentInput.version],
+        ),
+      );
+      await assert.rejects(
+        store.query(
+          `INSERT INTO consent_records(user_id,purpose,policy_version,granted,granted_at,capture_method,region,language)
+           VALUES($1,$2,$3,true,now(),'web','unspecified','en')`,
+          [actor.id, consentInput.purpose, consentInput.version],
+        ),
+      );
+
+      await service.createNotification(actor, "security_test", {
+        valid: true,
+      });
+      assert.equal(
+        (
+          await inActorContext(
+            actor.id,
+            "SELECT * FROM notifications WHERE user_id=$1",
+            [actor.id],
+          )
+        ).rowCount,
+        1,
+      );
+      assert.equal(
+        (
+          await inActorContext(
+            otherActor.id,
+            "SELECT * FROM notifications WHERE user_id=$1",
+            [actor.id],
+          )
+        ).rowCount,
+        0,
+      );
+      await assert.rejects(
+        inActorContext(
+          otherActor.id,
+          "INSERT INTO notifications(user_id,kind) VALUES($1,'cross_user')",
+          [actor.id],
+        ),
+      );
+      await assert.rejects(
+        store.query(
+          "INSERT INTO notifications(user_id,kind) VALUES($1,'missing')",
+          [actor.id],
+        ),
+      );
+
+      const exportRequest = await service.exportData(actor);
+      assert.equal(
+        (
+          await inActorContext(
+            actor.id,
+            "SELECT * FROM export_requests WHERE id=$1",
+            [exportRequest.id],
+          )
+        ).rowCount,
+        1,
+      );
+      assert.equal(
+        (
+          await inActorContext(
+            otherActor.id,
+            "SELECT * FROM export_requests WHERE id=$1",
+            [exportRequest.id],
+          )
+        ).rowCount,
+        0,
+      );
+      await assert.rejects(
+        inActorContext(
+          otherActor.id,
+          "INSERT INTO export_requests(user_id,expires_at) VALUES($1,now()+interval '1 day')",
+          [actor.id],
+        ),
+      );
+      await assert.rejects(
+        store.query(
+          "INSERT INTO export_requests(user_id,expires_at) VALUES($1,now()+interval '1 day')",
+          [actor.id],
+        ),
+      );
+
+      const documents = await admin.query(
+        `INSERT INTO documents(owner_id,object_id,encrypted_object_key,encrypted_data_key,mime_type,size_bytes)
+         VALUES ($1,$2,$3,decode('01','hex'),'application/octet-stream',1),
+                ($4,$5,$6,decode('02','hex'),'application/octet-stream',1),
+                ($1,$7,$8,decode('03','hex'),'application/octet-stream',1)
+         RETURNING id, owner_id`,
+        [
+          actor.id,
+          `owned-${suffix}`,
+          `owned-key-${suffix}`,
+          otherActor.id,
+          `other-${suffix}`,
+          `other-key-${suffix}`,
+          `deleted-${suffix}`,
+          `deleted-key-${suffix}`,
+        ],
+      );
+      const ownDocument = documents.rows[0];
+      const otherDocument = documents.rows[1];
+      const deletedDocument = documents.rows[2];
+      await admin.query("UPDATE documents SET deleted_at=now() WHERE id=$1", [
+        deletedDocument.id,
+      ]);
+      const importsBefore = await admin.query(
+        "SELECT count(*)::int AS count FROM imported_records",
+      );
+      await store.createImportedRecordMetadata(actor.id, {
+        documentId: ownDocument.id,
+        source: "security-test",
+        payloadCiphertext: Buffer.from("valid"),
+      });
+      for (const documentId of [
+        otherDocument.id,
+        deletedDocument.id,
+        registration.userId,
+      ])
+        await assert.rejects(
+          store.createImportedRecordMetadata(actor.id, {
+            documentId,
+            source: "security-test",
+            payloadCiphertext: Buffer.from("denied"),
+          }),
+          /Document unavailable/,
+        );
+      await assert.rejects(
+        inActorContext(
+          otherActor.id,
+          `INSERT INTO imported_records(user_id,document_id,source,payload_ciphertext)
+           VALUES($1,$2,'spoofed',decode('04','hex'))`,
+          [actor.id, ownDocument.id],
+        ),
+      );
+      const importsAfter = await admin.query(
+        "SELECT count(*)::int AS count FROM imported_records",
+      );
+      assert.equal(importsAfter.rows[0].count, importsBefore.rows[0].count + 1);
+
+      const deletionRequest = await service.deleteAccount(actor);
+      assert.equal(
+        (
+          await inActorContext(
+            actor.id,
+            "SELECT * FROM deletion_requests WHERE id=$1",
+            [deletionRequest.id],
+          )
+        ).rowCount,
+        1,
+      );
+      assert.equal(
+        (
+          await inActorContext(
+            otherActor.id,
+            "SELECT * FROM deletion_requests WHERE id=$1",
+            [deletionRequest.id],
+          )
+        ).rowCount,
+        0,
+      );
+      await assert.rejects(
+        inActorContext(
+          otherActor.id,
+          "INSERT INTO deletion_requests(user_id,cooling_off_until) VALUES($1,now()+interval '7 days')",
+          [actor.id],
+        ),
+      );
+      await assert.rejects(
+        store.query(
+          "INSERT INTO deletion_requests(user_id,cooling_off_until) VALUES($1,now()+interval '7 days')",
+          [actor.id],
+        ),
+      );
       const jobs = await store.query(
-        "SELECT kind FROM background_jobs WHERE payload_reference IN (SELECT id FROM export_requests WHERE user_id=$1 UNION SELECT id FROM deletion_requests WHERE user_id=$1)",
-        [actor.id],
+        "SELECT kind FROM background_jobs WHERE payload_reference = ANY($1::uuid[])",
+        [[exportRequest.id, deletionRequest.id]],
       );
       assert.deepEqual(
         new Set(jobs.rows.map((r) => r.kind)),
@@ -235,6 +471,18 @@ test(
       );
       assert.ok(audits.rowCount >= 5);
 
+      await assert.rejects(
+        store.transaction(
+          async (tx) => {
+            await tx.query("SET LOCAL row_security=off");
+            await tx.query("SELECT * FROM consent_records WHERE user_id=$1", [
+              otherActor.id,
+            ]);
+          },
+          { userId: actor.id },
+        ),
+      );
+
       const forcedRls = await store.query(
         `SELECT relname, relrowsecurity, relforcerowsecurity
            FROM pg_class
@@ -243,10 +491,14 @@ test(
         [
           [
             "conversations",
+            "consent_records",
+            "deletion_requests",
             "documents",
+            "export_requests",
             "health_entries",
             "imported_records",
             "messages",
+            "notifications",
             "profiles",
           ],
         ],
@@ -258,15 +510,20 @@ test(
           forced: row.relforcerowsecurity,
         })),
         [
+          { table: "consent_records", enabled: true, forced: true },
           { table: "conversations", enabled: true, forced: true },
+          { table: "deletion_requests", enabled: true, forced: true },
           { table: "documents", enabled: true, forced: true },
+          { table: "export_requests", enabled: true, forced: true },
           { table: "health_entries", enabled: true, forced: true },
           { table: "imported_records", enabled: true, forced: true },
           { table: "messages", enabled: true, forced: true },
+          { table: "notifications", enabled: true, forced: true },
           { table: "profiles", enabled: true, forced: true },
         ],
       );
     } finally {
+      await admin.end();
       await store.close();
     }
   },

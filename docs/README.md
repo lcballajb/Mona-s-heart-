@@ -8,7 +8,7 @@ This index identifies the canonical artifact for each topic so maintainers updat
 | Governance cadence and ownership | `governance/ONGOING_COMPLIANCE_AND_TECH_WATCH.md` | Responsibility matrix, source/register files, policy workflow                                                         |
 | Production decision              | `governance/PRODUCTION_GO_NO_GO.md`               | 90-day plan, readiness scorecard, risk register                                                                       |
 | System architecture              | `architecture/SYSTEM_OVERVIEW.md`                 | ADR-002 through ADR-006, backend/interoperability diagrams                                                            |
-| Security program                 | `security/SECURITY_PROGRAM.md`                    | Threat model, production controls, vulnerability, encryption, logging, supply chain                                   |
+| Security program                 | `security/SECURITY_PROGRAM.md`                    | Threat model, production controls, vulnerability, encryption, logging, supply chain; P0 actor/RLS audit               |
 | Privacy                          | `privacy/PRIVACY_ARCHITECTURE.md`                 | Data inventory/flow/classification, consent, retention/deletion/export                                                |
 | AI                               | `ai/AI_GOVERNANCE.md`                             | Architecture/data flow, model/prompt/vendor registers, safety/evaluation/incident plans                               |
 | Multi-agent future architecture  | `agents/AGENT_ROADMAP.md`                         | Registry, permission, communication, memory, validation, escalation, evaluation, audit, cost and change-control plans |
@@ -24,6 +24,8 @@ This index identifies the canonical artifact for each topic so maintainers updat
 ## Duplication rule
 
 Before adding a document, search this index and repository headings. Update the canonical file unless the artifact has a distinct owner, review cadence, version history, or operational record. Registers remain separate because they change independently from policies. ADRs remain immutable; supersede them with a new ADR. Policy files remain separate because each needs independent approval/version/notification history, even while all share one control schema in the registry.
+
+Security verification evidence: [P0 authenticated actor and RLS audit](security/P0_RLS_AUDIT.md).
 
 ## Source and provenance rule
 

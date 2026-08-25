@@ -303,22 +303,27 @@ export class PostgresStore {
     );
     return rows[0];
   }
-  async recordConsent(input) {
-    const { rows } = await this.query(
-      `INSERT INTO consent_records(user_id,purpose,policy_version,granted,granted_at,withdrawn_at,capture_method,region,language,organization_id) VALUES($1,$2,$3,$4,now(),$5,$6,$7,$8,$9) RETURNING *`,
-      [
-        input.userId,
-        input.purpose,
-        input.version,
-        input.granted,
-        input.withdrawnAt,
-        input.sourceInterface,
-        input.region,
-        input.language,
-        input.organizationId,
-      ],
+  async recordConsent(userId, input) {
+    return this.transaction(
+      async (tx) => {
+        const { rows } = await tx.query(
+          `INSERT INTO consent_records(user_id,purpose,policy_version,granted,granted_at,withdrawn_at,capture_method,region,language,organization_id) VALUES($1,$2,$3,$4,now(),$5,$6,$7,$8,$9) RETURNING *`,
+          [
+            userId,
+            input.purpose,
+            input.version,
+            input.granted,
+            input.withdrawnAt,
+            input.sourceInterface,
+            input.region,
+            input.language,
+            input.organizationId,
+          ],
+        );
+        return rows[0];
+      },
+      { userId },
     );
-    return rows[0];
   }
   async createJob(kind, payloadReference, scheduledAt = this.now()) {
     const { rows } = await this.query(
@@ -363,34 +368,41 @@ export class PostgresStore {
     return rows[0];
   }
   async createExportRequest(userId) {
-    return this.transaction(async (tx) => {
-      const { rows } = await tx.query(
-        "INSERT INTO export_requests(user_id,expires_at) VALUES($1,now()+interval '24 hours') RETURNING *",
-        [userId],
-      );
-      await tx.createJob("data_export", rows[0].id);
-      await tx.audit("export_request", userId, userId);
-      return rows[0];
-    });
+    return this.transaction(
+      async (tx) => {
+        const { rows } = await tx.query(
+          "INSERT INTO export_requests(user_id,expires_at) VALUES($1,now()+interval '24 hours') RETURNING *",
+          [userId],
+        );
+        await tx.createJob("data_export", rows[0].id);
+        await tx.audit("export_request", userId, userId);
+        return rows[0];
+      },
+      { userId },
+    );
   }
   async createDeletionRequest(userId) {
-    return this.transaction(async (tx) => {
-      await tx.query("UPDATE users SET status='deletion_pending' WHERE id=$1", [
-        userId,
-      ]);
-      await tx.revokeUserSessions(userId);
-      const { rows } = await tx.query(
-        "INSERT INTO deletion_requests(user_id,cooling_off_until) VALUES($1,now()+interval '7 days') RETURNING *",
-        [userId],
-      );
-      await tx.createJob(
-        "account_deletion",
-        rows[0].id,
-        rows[0].cooling_off_until,
-      );
-      await tx.audit("deletion_request", userId, userId);
-      return rows[0];
-    });
+    return this.transaction(
+      async (tx) => {
+        await tx.query(
+          "UPDATE users SET status='deletion_pending' WHERE id=$1",
+          [userId],
+        );
+        await tx.revokeUserSessions(userId);
+        const { rows } = await tx.query(
+          "INSERT INTO deletion_requests(user_id,cooling_off_until) VALUES($1,now()+interval '7 days') RETURNING *",
+          [userId],
+        );
+        await tx.createJob(
+          "account_deletion",
+          rows[0].id,
+          rows[0].cooling_off_until,
+        );
+        await tx.audit("deletion_request", userId, userId);
+        return rows[0];
+      },
+      { userId },
+    );
   }
   async approveRole(actorId, userId, role, reason) {
     return this.transaction(async (tx) => {
@@ -515,18 +527,41 @@ export class PostgresStore {
     return rows[0] ?? null;
   }
   async createImportedRecordMetadata(userId, input) {
-    const { rows } = await this.query(
-      "INSERT INTO imported_records(user_id,document_id,source,payload_ciphertext) VALUES($1,$2,$3,$4) RETURNING *",
-      [userId, input.documentId ?? null, input.source, input.payloadCiphertext],
+    return this.transaction(
+      async (tx) => {
+        const { rows } = await tx.query(
+          `INSERT INTO imported_records(user_id,document_id,source,payload_ciphertext)
+           SELECT $1,$2,$3,$4
+           WHERE $2::uuid IS NULL OR EXISTS (
+             SELECT 1 FROM documents
+              WHERE id=$2 AND owner_id=$1 AND deleted_at IS NULL
+           )
+           RETURNING *`,
+          [
+            userId,
+            input.documentId ?? null,
+            input.source,
+            input.payloadCiphertext,
+          ],
+        );
+        if (!rows[0])
+          throw new Error("Document unavailable for imported record");
+        return rows[0];
+      },
+      { userId },
     );
-    return rows[0];
   }
   async createNotification(userId, kind, payload = {}) {
-    const { rows } = await this.query(
-      "INSERT INTO notifications(user_id,kind,payload) VALUES($1,$2,$3) RETURNING *",
-      [userId, kind, payload],
+    return this.transaction(
+      async (tx) => {
+        const { rows } = await tx.query(
+          "INSERT INTO notifications(user_id,kind,payload) VALUES($1,$2,$3) RETURNING *",
+          [userId, kind, payload],
+        );
+        return rows[0];
+      },
+      { userId },
     );
-    return rows[0];
   }
   async setFeatureFlag(actorId, key, environment, enabled, rules = {}) {
     return this.transaction(async (tx) => {
