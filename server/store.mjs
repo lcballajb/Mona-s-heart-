@@ -247,8 +247,8 @@ export class MemoryStore {
         m.status === "active",
     );
   }
-  recordConsent(input) {
-    const row = { ...input, grantedAt: this.now() };
+  recordConsent(userId, input) {
+    const row = { ...input, userId, grantedAt: this.now() };
     this.consents.push(row);
     return row;
   }

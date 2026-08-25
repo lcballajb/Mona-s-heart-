@@ -3,11 +3,17 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createPool } from "../server/database.mjs";
 
+if (!process.env.DB_ADMIN_URL)
+  throw new Error("DB_ADMIN_URL is required for migrations");
+
 const directory = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../db/migrations",
 );
-const pool = createPool();
+const pool = createPool({
+  ...process.env,
+  DATABASE_URL: process.env.DB_ADMIN_URL,
+});
 try {
   await pool.query(
     `CREATE TABLE IF NOT EXISTS schema_migrations (version text PRIMARY KEY, checksum text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())`,
