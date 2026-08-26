@@ -75,6 +75,7 @@ try {
   const updatableTables = [
     "account_tokens",
     "background_jobs",
+    "deletion_requests",
     "feature_flags",
     "profiles",
     "sessions",
@@ -91,6 +92,9 @@ try {
   );
   await client.query(
     `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${identifier}`,
+  );
+  await client.query(
+    `GRANT EXECUTE ON FUNCTION complete_account_deletion(uuid) TO ${identifier}`,
   );
 } finally {
   await client.end();

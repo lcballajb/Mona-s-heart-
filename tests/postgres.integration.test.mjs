@@ -666,6 +666,94 @@ test(
           { table: "profiles", enabled: true, forced: true },
         ],
       );
+
+      const duplicateDeletion = await service.deleteAccount(actor);
+      assert.equal(duplicateDeletion.id, deletionRequest.id);
+      assert.equal(
+        await store.completeDeletionRequest(deletionRequest.id),
+        true,
+      );
+      assert.equal(
+        await store.completeDeletionRequest(deletionRequest.id),
+        true,
+      );
+      const deletedUser = await admin.query(
+        "SELECT status,deleted_at,email FROM users WHERE id=$1",
+        [actor.id],
+      );
+      assert.equal(deletedUser.rows[0].status, "deleted");
+      assert.ok(deletedUser.rows[0].deleted_at);
+      assert.match(deletedUser.rows[0].email, /^deleted\+/);
+      for (const [table, column] of [
+        ["profiles", "user_id"],
+        ["health_entries", "user_id"],
+        ["documents", "owner_id"],
+        ["imported_records", "user_id"],
+        ["notifications", "user_id"],
+        ["export_requests", "user_id"],
+        ["organization_memberships", "user_id"],
+        ["account_tokens", "user_id"],
+      ]) {
+        const remaining = await admin.query(
+          `SELECT count(*)::int AS count FROM ${table} WHERE ${column}=$1`,
+          [actor.id],
+        );
+        assert.equal(remaining.rows[0].count, 0, table);
+      }
+      const lifecycleAudit = await admin.query(
+        "SELECT event_type FROM audit_events WHERE subject_id=$1 AND event_type LIKE 'deletion_%' ORDER BY occurred_at",
+        [actor.id],
+      );
+      assert.deepEqual(
+        lifecycleAudit.rows.map((row) => row.event_type),
+        ["deletion_request", "deletion_started", "deletion_completed"],
+      );
+
+      const workerPrivileges = await store.query(
+        `SELECT has_function_privilege(current_user,'complete_account_deletion(uuid)','EXECUTE') AS can_execute,
+                has_table_privilege(current_user,'profiles','DELETE') AS can_delete_profiles`,
+      );
+      assert.deepEqual(workerPrivileges.rows[0], {
+        can_execute: true,
+        can_delete_profiles: false,
+      });
+
+      const retryRegistration = await service.register({
+        email: `deletion-retry-${suffix}@example.test`,
+        password: "correct horse battery staple",
+      });
+      await service.verifyEmail(retryRegistration.verificationToken);
+      const retryActor = await store.findUserById(retryRegistration.userId);
+      await admin.query(
+        "INSERT INTO profiles(user_id,display_name) VALUES($1,'Retry safely')",
+        [retryActor.id],
+      );
+      const retryRequest = await service.deleteAccount(retryActor);
+      await admin.query(
+        `CREATE FUNCTION fail_deletion_test() RETURNS trigger LANGUAGE plpgsql AS
+         $$ BEGIN RAISE EXCEPTION 'forced partial failure'; END $$`,
+      );
+      await admin.query(
+        "CREATE TRIGGER fail_deletion_test BEFORE DELETE ON profiles FOR EACH ROW EXECUTE FUNCTION fail_deletion_test()",
+      );
+      await assert.rejects(
+        store.completeDeletionRequest(retryRequest.id),
+        /failed closed/,
+      );
+      const failedClosed = await admin.query(
+        `SELECT d.status,u.status AS user_status,
+                EXISTS(SELECT 1 FROM profiles p WHERE p.user_id=u.id) AS profile_exists
+           FROM deletion_requests d JOIN users u ON u.id=d.user_id WHERE d.id=$1`,
+        [retryRequest.id],
+      );
+      assert.deepEqual(failedClosed.rows[0], {
+        status: "failed",
+        user_status: "deletion_pending",
+        profile_exists: true,
+      });
+      await admin.query("DROP TRIGGER fail_deletion_test ON profiles");
+      await admin.query("DROP FUNCTION fail_deletion_test() ");
+      assert.equal(await store.completeDeletionRequest(retryRequest.id), true);
     } finally {
       await admin.end();
       await store.close();

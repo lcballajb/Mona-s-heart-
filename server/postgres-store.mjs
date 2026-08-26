@@ -122,8 +122,10 @@ export class PostgresStore {
         "UPDATE account_tokens SET consumed_at=now() WHERE user_id=$1 AND purpose=$2 AND consumed_at IS NULL",
         [userId, purpose],
       );
-      await tx.query(
-        "INSERT INTO account_tokens(user_id,purpose,token_digest,expires_at) VALUES($1,$2,decode($3,'hex'),$4)",
+      const inserted = await tx.query(
+        `INSERT INTO account_tokens(user_id,purpose,token_digest,expires_at)
+         SELECT $1,$2,decode($3,'hex'),$4 FROM users
+          WHERE id=$1 AND status NOT IN ('deletion_pending','deleted')`,
         [
           userId,
           purpose,
@@ -131,6 +133,8 @@ export class PostgresStore {
           new Date(this.clock().getTime() + ttlMs),
         ],
       );
+      if (inserted.rowCount !== 1)
+        throw new Error("Account is not eligible for credentials");
     });
   }
   async consumeAccountToken(purpose, rawToken) {
@@ -161,9 +165,10 @@ export class PostgresStore {
       // lock used by issuance. Locking the row first would invert lock order and
       // could deadlock with a concurrent replacement request.
       const candidate = await tx.query(
-        `SELECT user_id FROM account_tokens
-         WHERE purpose=$1 AND token_digest=decode($2,'hex')
-           AND consumed_at IS NULL AND expires_at>now()`,
+        `SELECT t.user_id FROM account_tokens t JOIN users u ON u.id=t.user_id
+         WHERE t.purpose=$1 AND t.token_digest=decode($2,'hex')
+           AND u.status NOT IN ('deletion_pending','deleted')
+           AND t.consumed_at IS NULL AND t.expires_at>now()`,
         [purpose, digest],
       );
       const userId = candidate.rows[0]?.user_id;
@@ -172,9 +177,10 @@ export class PostgresStore {
         `account_token:${userId}:${purpose}`,
       ]);
       const matched = await tx.query(
-        `SELECT 1 FROM account_tokens
-         WHERE user_id=$1 AND purpose=$2 AND token_digest=decode($3,'hex')
-           AND consumed_at IS NULL AND expires_at>now()
+        `SELECT 1 FROM account_tokens t JOIN users u ON u.id=t.user_id
+         WHERE t.user_id=$1 AND t.purpose=$2 AND t.token_digest=decode($3,'hex')
+           AND u.status NOT IN ('deletion_pending','deleted')
+           AND t.consumed_at IS NULL AND t.expires_at>now()
          FOR UPDATE`,
         [userId, purpose, digest],
       );
@@ -384,13 +390,26 @@ export class PostgresStore {
   async createDeletionRequest(userId) {
     return this.transaction(
       async (tx) => {
-        await tx.query(
-          "UPDATE users SET status='deletion_pending' WHERE id=$1",
+        const existing = await tx.query(
+          `SELECT * FROM deletion_requests WHERE user_id=$1
+           AND status IN ('pending_verification','cooling_off','processing','failed','legal_hold')
+           ORDER BY requested_at DESC LIMIT 1 FOR UPDATE`,
           [userId],
         );
+        if (existing.rows[0]) return existing.rows[0];
+        const cutoff = await tx.query(
+          "UPDATE users SET status='deletion_pending' WHERE id=$1 AND status='active' RETURNING id",
+          [userId],
+        );
+        if (!cutoff.rows[0])
+          throw new Error("Account is not eligible for deletion");
         await tx.revokeUserSessions(userId);
+        await tx.query(
+          "UPDATE account_tokens SET consumed_at=now() WHERE user_id=$1 AND consumed_at IS NULL",
+          [userId],
+        );
         const { rows } = await tx.query(
-          "INSERT INTO deletion_requests(user_id,cooling_off_until) VALUES($1,now()+interval '7 days') RETURNING *",
+          "INSERT INTO deletion_requests(user_id,status,cooling_off_until) VALUES($1,'pending_verification',now()) RETURNING *",
           [userId],
         );
         await tx.createJob(
@@ -403,6 +422,14 @@ export class PostgresStore {
       },
       { userId },
     );
+  }
+  async completeDeletionRequest(requestId) {
+    const { rows } = await this.query(
+      "SELECT complete_account_deletion($1) AS completed",
+      [requestId],
+    );
+    if (!rows[0]?.completed) throw new Error("Account deletion failed closed");
+    return true;
   }
   async approveRole(actorId, userId, role, reason) {
     return this.transaction(async (tx) => {
