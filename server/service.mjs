@@ -124,7 +124,7 @@ export class MonaService {
       return generic;
     }
     const user = await this.store.findUserByEmail(normalized);
-    if (!user) {
+    if (!user || user.status !== "active") {
       await verifyPassword("comparison password", await this.dummyPasswordHash);
       return generic;
     }

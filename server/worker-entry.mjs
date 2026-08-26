@@ -5,6 +5,10 @@ import { createLogger } from "./observability.mjs";
 const store = await createStore();
 const worker = new Worker({
   store,
+  handlers: {
+    account_deletion: ({ reference }) =>
+      store.completeDeletionRequest(reference),
+  },
   concurrency: Number(process.env.WORKER_CONCURRENCY ?? 2),
   logger: createLogger(),
 });

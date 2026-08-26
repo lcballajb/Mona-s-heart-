@@ -97,6 +97,10 @@ export class MemoryStore {
     return session.csrfToken === rawToken;
   }
   createAccountToken(userId, purpose, rawToken, ttlMs) {
+    const user = this.findUserById(userId);
+    const eligible = !["deletion_pending", "deleted"].includes(user?.status);
+    if (user && !eligible)
+      throw new Error("Account is not eligible for credentials");
     const consumedAt = this.now();
     for (const candidate of this.accountTokens)
       if (
@@ -175,6 +179,10 @@ export class MemoryStore {
     return (
       this.accountTokens.find(
         (candidate) =>
+          (!this.users.has(candidate.userId) ||
+            !["deletion_pending", "deleted"].includes(
+              this.users.get(candidate.userId)?.status,
+            )) &&
           candidate.purpose === purpose &&
           candidate.digest === tokenDigest(rawToken) &&
           !candidate.consumedAt &&
@@ -327,21 +335,75 @@ export class MemoryStore {
   }
   createDeletionRequest(userId) {
     const user = this.users.get(userId);
+    const existing = this.deletionRequests.find(
+      (row) =>
+        row.userId === userId &&
+        ["pending_verification", "processing", "failed", "legal_hold"].includes(
+          row.status,
+        ),
+    );
+    if (existing) return existing;
+    if (!user || user.status !== "active")
+      throw new Error("Account is not eligible for deletion");
     user.status = "deletion_pending";
     this.revokeUserSessions(userId);
+    for (const token of this.accountTokens)
+      if (token.userId === userId && !token.consumedAt)
+        token.consumedAt = this.now();
     const row = {
       id: randomUUID(),
       userId,
       status: "pending_verification",
       legalHold: false,
-      coolingOffUntil: new Date(
-        this.clock().getTime() + 7 * 86_400_000,
-      ).toISOString(),
+      coolingOffUntil: this.now(),
     };
     this.deletionRequests.push(row);
     this.createJob("account_deletion", row.id, row.coolingOffUntil);
     this.audit("deletion_request", userId, userId);
     return row;
+  }
+  completeDeletionRequest(requestId) {
+    const request = this.deletionRequests.find((row) => row.id === requestId);
+    if (!request) throw new Error("Deletion request not found");
+    if (request.status === "completed") return true;
+    if (
+      request.legalHold ||
+      ["cancelled", "legal_hold"].includes(request.status)
+    )
+      throw new Error("Deletion request is not executable");
+    const userId = request.userId;
+    request.status = "processing";
+    this.audit("deletion_started", userId, userId);
+    this.accountTokens = this.accountTokens.filter(
+      (row) => row.userId !== userId,
+    );
+    this.notifications = this.notifications.filter(
+      (row) => row.userId !== userId,
+    );
+    this.exportRequests = this.exportRequests.filter(
+      (row) => row.userId !== userId,
+    );
+    this.importedRecords = this.importedRecords.filter(
+      (row) => row.userId !== userId,
+    );
+    this.documents = this.documents.filter((row) => row.ownerId !== userId);
+    this.healthEntries = this.healthEntries.filter(
+      (row) => row.userId !== userId,
+    );
+    this.profiles.delete(userId);
+    this.consents = this.consents.filter((row) => row.userId !== userId);
+    this.memberships = this.memberships.filter((row) => row.userId !== userId);
+    this.messages = this.messages.filter((row) => row.senderId !== userId);
+    const user = this.users.get(userId);
+    user.email = `deleted+${userId}@deleted.invalid`;
+    user.passwordHash = "deleted-account";
+    user.roles = [];
+    user.status = "deleted";
+    user.deletedAt = this.now();
+    request.status = "completed";
+    request.completedAt = this.now();
+    this.audit("deletion_completed", userId, userId);
+    return true;
   }
   createBlock(blockerId, blockedId) {
     const row = { blockerId, blockedId, createdAt: this.now() };
