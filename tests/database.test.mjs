@@ -51,6 +51,31 @@ test(
   },
 );
 
+test(
+  "runtime role attestation fails closed without an expected or verifiable identity",
+  { skip: !database },
+  async () => {
+    const { attestRuntimeRole } = database;
+    let connected = false;
+    const pool = {
+      async connect() {
+        connected = true;
+        throw new Error("connection details that must not escape");
+      },
+    };
+
+    await assert.rejects(
+      attestRuntimeRole(pool, { expectedRole: "" }),
+      /^Error: PostgreSQL runtime role attestation failed$/,
+    );
+    assert.equal(connected, false);
+    await assert.rejects(
+      attestRuntimeRole(pool, { expectedRole: "app_runtime" }),
+      /^Error: PostgreSQL runtime role attestation failed$/,
+    );
+  },
+);
+
 test("MemoryStore singular lookups return objects or null", () => {
   let now = new Date("2026-01-01T00:00:00Z");
   const store = new MemoryStore(() => now);

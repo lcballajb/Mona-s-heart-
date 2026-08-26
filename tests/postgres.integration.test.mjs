@@ -21,14 +21,16 @@ test(
     process.env.NODE_ENV = "test";
     process.env.DATABASE_SSL = "false";
     const [
-      { createPool },
+      { attestRuntimeRole, createPool },
       { PostgresStore },
+      { createStore },
       { MonaService },
       { verifyPassword },
       { Client },
     ] = await Promise.all([
       import("../server/database.mjs"),
       import("../server/postgres-store.mjs"),
+      import("../server/store-factory.mjs"),
       import("../server/service.mjs"),
       import("../server/security.mjs"),
       import("pg"),
@@ -39,6 +41,148 @@ test(
     const admin = new Client({ connectionString: adminUrl, ssl: false });
     await admin.connect();
     try {
+      const startupStore = await createStore({
+        ...process.env,
+        DATABASE_URL: url,
+        DB_RUNTIME_USER: process.env.DB_RUNTIME_USER,
+      });
+      await startupStore.close();
+      await assert.rejects(
+        createStore({
+          ...process.env,
+          DATABASE_URL: adminUrl,
+          DB_RUNTIME_USER: process.env.DB_RUNTIME_USER,
+        }),
+        /PostgreSQL readiness check failed/,
+      );
+      await attestRuntimeRole(pool, {
+        expectedRole: process.env.DB_RUNTIME_USER,
+      });
+      await assert.rejects(
+        attestRuntimeRole(pool, { expectedRole: "unexpected_runtime" }),
+        /runtime role attestation failed/,
+      );
+
+      const unsafePassword = "unsafe_test_password";
+      const securitySuffix = Date.now();
+      const roleNames = {
+        bypass: `mona_test_bypass_${securitySuffix}`,
+        privileged: `mona_test_admin_${securitySuffix}`,
+        replication: `mona_test_replication_${securitySuffix}`,
+        schemaCreator: `mona_test_schema_${securitySuffix}`,
+        tableOwner: `mona_test_owner_${securitySuffix}`,
+      };
+      const unsafeRoles = [
+        [roleNames.bypass, "BYPASSRLS"],
+        [roleNames.privileged, "CREATEDB CREATEROLE"],
+        [roleNames.replication, "REPLICATION"],
+        [roleNames.schemaCreator, ""],
+        [roleNames.tableOwner, ""],
+      ];
+      const databaseName = (
+        await admin.query("SELECT current_database() AS name")
+      ).rows[0].name;
+      const quotedDatabaseName = `"${databaseName.replaceAll('"', '""')}"`;
+      const roleUrl = (role) => {
+        const parsed = new URL(url);
+        parsed.username = role;
+        parsed.password = unsafePassword;
+        return parsed.toString();
+      };
+      const attestUnsafeRole = async (role) => {
+        const unsafePool = createPool({
+          ...process.env,
+          DATABASE_URL: roleUrl(role),
+        });
+        try {
+          await assert.rejects(
+            attestRuntimeRole(unsafePool, { expectedRole: role }),
+            /^Error: PostgreSQL runtime role attestation failed$/,
+          );
+        } finally {
+          await unsafePool.end();
+        }
+      };
+
+      for (const [role, attributes] of unsafeRoles) {
+        await admin.query(`DROP ROLE IF EXISTS ${role}`);
+        await admin.query(
+          `CREATE ROLE ${role} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD '${unsafePassword}'`,
+        );
+        if (attributes)
+          await admin.query(`ALTER ROLE ${role} WITH ${attributes}`);
+        await admin.query(
+          `GRANT CONNECT ON DATABASE ${quotedDatabaseName} TO ${role}`,
+        );
+        await admin.query(`GRANT USAGE ON SCHEMA public TO ${role}`);
+      }
+
+      const adminPool = createPool({
+        ...process.env,
+        DATABASE_URL: adminUrl,
+      });
+      try {
+        await assert.rejects(
+          attestRuntimeRole(adminPool, { expectedRole: "mona_admin" }),
+          /runtime role attestation failed/,
+        );
+      } finally {
+        await adminPool.end();
+      }
+      await attestUnsafeRole(roleNames.bypass);
+      await attestUnsafeRole(roleNames.privileged);
+      await attestUnsafeRole(roleNames.replication);
+
+      await admin.query(`GRANT ${roleNames.bypass} TO ${roleNames.tableOwner}`);
+      await attestUnsafeRole(roleNames.tableOwner);
+      await admin.query(
+        `REVOKE ${roleNames.bypass} FROM ${roleNames.tableOwner}`,
+      );
+
+      await admin.query(
+        `GRANT CREATE ON DATABASE ${quotedDatabaseName} TO ${roleNames.schemaCreator}`,
+      );
+      await attestUnsafeRole(roleNames.schemaCreator);
+      await admin.query(
+        `REVOKE CREATE ON DATABASE ${quotedDatabaseName} FROM ${roleNames.schemaCreator}`,
+      );
+
+      await admin.query(
+        `GRANT CREATE ON SCHEMA public TO ${roleNames.schemaCreator}`,
+      );
+      await attestUnsafeRole(roleNames.schemaCreator);
+      await admin.query(
+        `REVOKE CREATE ON SCHEMA public FROM ${roleNames.schemaCreator}`,
+      );
+
+      await admin.query(
+        `GRANT TRUNCATE ON notifications TO ${roleNames.schemaCreator}`,
+      );
+      await attestUnsafeRole(roleNames.schemaCreator);
+      await admin.query(
+        `REVOKE TRUNCATE ON notifications FROM ${roleNames.schemaCreator}`,
+      );
+
+      await admin.query(
+        `ALTER TABLE profiles OWNER TO ${roleNames.tableOwner}`,
+      );
+      await attestUnsafeRole(roleNames.tableOwner);
+      await admin.query("ALTER TABLE profiles OWNER TO mona_admin");
+
+      await admin.query(
+        "ALTER TABLE organization_memberships DISABLE ROW LEVEL SECURITY",
+      );
+      await assert.rejects(
+        attestRuntimeRole(pool, { expectedRole: process.env.DB_RUNTIME_USER }),
+        /runtime role attestation failed/,
+      );
+      await admin.query(
+        "ALTER TABLE organization_memberships ENABLE ROW LEVEL SECURITY",
+      );
+      await admin.query(
+        "ALTER TABLE organization_memberships FORCE ROW LEVEL SECURITY",
+      );
+
       const suffix = Date.now();
       const registration = await service.register({
         email: `fictional-${suffix}@example.test`,
