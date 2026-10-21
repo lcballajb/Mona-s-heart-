@@ -200,7 +200,11 @@ export class MonaService {
   }
   async actor(token) {
     const session = await this.store.session(token);
-    return session ? this.store.findUserById(session.userId) : null;
+    if (!session) return null;
+    const user = await this.store.findUserById(session.userId);
+    return user?.status === "active" && user.verifiedAt && !user.deletedAt
+      ? user
+      : null;
   }
   async approveRole(actor, userId, role, reason) {
     requireAnyRole(actor, ["administrator"]);

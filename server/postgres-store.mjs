@@ -12,6 +12,7 @@ const mapUser = (r) =>
         passwordAlgorithm: r.password_algorithm,
         roles: r.roles ?? [],
         status: r.status,
+        deletedAt: iso(r.deleted_at),
         verifiedAt: iso(r.email_verified_at),
         failedAttempts: r.failed_attempts,
         lockedUntil: iso(r.locked_until),
