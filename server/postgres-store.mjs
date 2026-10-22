@@ -21,10 +21,15 @@ const mapUser = (r) =>
     : null;
 
 export class PostgresStore {
-  constructor(pool, clock = () => new Date(), { sessionPepper = "" } = {}) {
+  constructor(
+    pool,
+    clock = () => new Date(),
+    { sessionPepper = "", rlsContext = null } = {},
+  ) {
     this.pool = pool;
     this.clock = clock;
     this.sessionPepper = sessionPepper;
+    this.rlsContext = rlsContext;
   }
   now() {
     return this.clock().toISOString();
@@ -65,6 +70,10 @@ export class PostgresStore {
       const value = await work(
         new PostgresStore(client, this.clock, {
           sessionPepper: this.sessionPepper,
+          rlsContext: {
+            userId: context.userId ?? null,
+            organizationIds: context.organizationIds ?? [],
+          },
         }),
       );
       await client.query("COMMIT");
@@ -76,6 +85,15 @@ export class PostgresStore {
     } finally {
       client.release();
     }
+  }
+  async asUser(userId, work) {
+    if (!userId) throw new TypeError("User context is required");
+    if (this.rlsContext?.userId === userId) return work(this);
+    if (this.rlsContext)
+      throw Object.assign(new Error("RLS user context mismatch"), {
+        code: "RLS_CONTEXT_MISMATCH",
+      });
+    return this.transaction(work, { userId });
   }
   async createUser(input) {
     const id = randomUUID();
@@ -445,36 +463,42 @@ export class PostgresStore {
     return rows[0];
   }
   async upsertProfile(userId, profile) {
-    const { rows } = await this.query(
-      `INSERT INTO profiles(user_id,display_name,pronouns,locale) VALUES($1,$2,$3,$4) ON CONFLICT(user_id) DO UPDATE SET display_name=EXCLUDED.display_name,pronouns=EXCLUDED.pronouns,locale=EXCLUDED.locale,updated_at=now() RETURNING *`,
-      [
-        userId,
-        profile.displayName,
-        profile.pronouns ?? null,
-        profile.locale ?? "en",
-      ],
-    );
-    return rows[0];
+    return this.asUser(userId, async (tx) => {
+      const { rows } = await tx.query(
+        `INSERT INTO profiles(user_id,display_name,pronouns,locale) VALUES($1,$2,$3,$4) ON CONFLICT(user_id) DO UPDATE SET display_name=EXCLUDED.display_name,pronouns=EXCLUDED.pronouns,locale=EXCLUDED.locale,updated_at=now() RETURNING *`,
+        [
+          userId,
+          profile.displayName,
+          profile.pronouns ?? null,
+          profile.locale ?? "en",
+        ],
+      );
+      return rows[0];
+    });
   }
   async createHealthEntry(userId, entry) {
-    const { rows } = await this.query(
-      `INSERT INTO health_entries(user_id,kind,label_ciphertext,details_ciphertext,visibility) VALUES($1,$2,$3,$4,$5) RETURNING *`,
-      [
-        userId,
-        entry.kind,
-        entry.labelCiphertext,
-        entry.detailsCiphertext ?? null,
-        entry.visibility ?? "private",
-      ],
-    );
-    return rows[0];
+    return this.asUser(userId, async (tx) => {
+      const { rows } = await tx.query(
+        `INSERT INTO health_entries(user_id,kind,label_ciphertext,details_ciphertext,visibility) VALUES($1,$2,$3,$4,$5) RETURNING *`,
+        [
+          userId,
+          entry.kind,
+          entry.labelCiphertext,
+          entry.detailsCiphertext ?? null,
+          entry.visibility ?? "private",
+        ],
+      );
+      return rows[0];
+    });
   }
   async listOwnHealthEntries(userId) {
-    const { rows } = await this.query(
-      "SELECT * FROM health_entries WHERE user_id=$1 ORDER BY created_at",
-      [userId],
-    );
-    return rows;
+    return this.asUser(userId, async (tx) => {
+      const { rows } = await tx.query(
+        "SELECT * FROM health_entries WHERE user_id=$1 ORDER BY created_at",
+        [userId],
+      );
+      return rows;
+    });
   }
   async createOrganization(input) {
     const { rows } = await this.query(
@@ -502,55 +526,55 @@ export class PostgresStore {
     );
   }
   async createDocumentMetadata(ownerId, input) {
-    const { rows } = await this.query(
-      `INSERT INTO documents(owner_id,object_id,storage_provider,encrypted_object_key,encrypted_data_key,mime_type,size_bytes,checksum,scan_status,retention_at,access_policy) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-      [
-        ownerId,
-        input.objectId,
-        input.storageProvider,
-        input.encryptedObjectKey,
-        input.encryptedDataKey,
-        input.mimeType,
-        input.sizeBytes,
-        input.checksum,
-        input.malwareScanStatus ?? "pending",
-        input.retentionAt ?? null,
-        input.accessPolicy ?? {},
-      ],
-    );
-    return rows[0];
+    return this.asUser(ownerId, async (tx) => {
+      const { rows } = await tx.query(
+        `INSERT INTO documents(owner_id,object_id,storage_provider,encrypted_object_key,encrypted_data_key,mime_type,size_bytes,checksum,scan_status,retention_at,access_policy) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+        [
+          ownerId,
+          input.objectId,
+          input.storageProvider,
+          input.encryptedObjectKey,
+          input.encryptedDataKey,
+          input.mimeType,
+          input.sizeBytes,
+          input.checksum,
+          input.malwareScanStatus ?? "pending",
+          input.retentionAt ?? null,
+          input.accessPolicy ?? {},
+        ],
+      );
+      return rows[0];
+    });
   }
   async getOwnDocument(ownerId, id) {
-    const { rows } = await this.query(
-      "SELECT * FROM documents WHERE id=$1 AND owner_id=$2 AND deleted_at IS NULL",
-      [id, ownerId],
-    );
-    return rows[0] ?? null;
+    return this.asUser(ownerId, async (tx) => {
+      const { rows } = await tx.query(
+        "SELECT * FROM documents WHERE id=$1 AND owner_id=$2 AND deleted_at IS NULL",
+        [id, ownerId],
+      );
+      return rows[0] ?? null;
+    });
   }
   async createImportedRecordMetadata(userId, input) {
-    return this.transaction(
-      async (tx) => {
-        const { rows } = await tx.query(
-          `INSERT INTO imported_records(user_id,document_id,source,payload_ciphertext)
+    return this.asUser(userId, async (tx) => {
+      const { rows } = await tx.query(
+        `INSERT INTO imported_records(user_id,document_id,source,payload_ciphertext)
            SELECT $1,$2,$3,$4
            WHERE $2::uuid IS NULL OR EXISTS (
              SELECT 1 FROM documents
               WHERE id=$2 AND owner_id=$1 AND deleted_at IS NULL
            )
            RETURNING *`,
-          [
-            userId,
-            input.documentId ?? null,
-            input.source,
-            input.payloadCiphertext,
-          ],
-        );
-        if (!rows[0])
-          throw new Error("Document unavailable for imported record");
-        return rows[0];
-      },
-      { userId },
-    );
+        [
+          userId,
+          input.documentId ?? null,
+          input.source,
+          input.payloadCiphertext,
+        ],
+      );
+      if (!rows[0]) throw new Error("Document unavailable for imported record");
+      return rows[0];
+    });
   }
   async createNotification(userId, kind, payload = {}) {
     return this.transaction(
