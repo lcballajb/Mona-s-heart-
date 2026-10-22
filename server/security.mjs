@@ -88,3 +88,12 @@ export function requireAnyRole(actor, roles) {
     throw error;
   }
 }
+
+// The opaque session secret is the HMAC key, never the returned value. Stable
+// domain separation lets reloads/tabs rehydrate CSRF without exposing the cookie
+// or rotating another tab's token. Only its digest is persisted in PostgreSQL.
+export function sessionCsrfToken(rawSessionToken) {
+  return createHmac("sha256", rawSessionToken)
+    .update("monas-heart:session-csrf:v1")
+    .digest("base64url");
+}

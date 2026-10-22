@@ -8,3 +8,6 @@ dist/
 coverage/
 
 *.tsbuildinfo
+
+# Private synthetic development delivery must never be committed.
+.dev-outbox/

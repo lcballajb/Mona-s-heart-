@@ -1,3 +1,6 @@
+import { mkdir, writeFile, realpath, stat } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { randomUUID } from "node:crypto";
 export const EMAIL_KINDS = Object.freeze([
   "account_verification",
   "password_reset",
@@ -84,6 +87,49 @@ export class DevelopmentConsoleEmailProvider extends EmailProvider {
   }
 }
 
+// Explicit developer-only delivery seam. It never exposes tokens over HTTP or
+// ordinary logs. The directory must be private and outside public assets.
+export class DevelopmentFileEmailProvider extends EmailProvider {
+  constructor(directory) {
+    super("development_file");
+    if (!directory) throw new Error("DEVELOPMENT_OUTBOX_DIR is required");
+    this.directory = resolve(directory);
+    if (
+      this.directory === resolve(".") ||
+      this.directory.startsWith(resolve(".") + "/")
+    )
+      throw new Error(
+        "Development outbox must not be in published assets or the repository",
+      );
+  }
+  async send(message) {
+    if (!message.to.endsWith(".test"))
+      throw new Error(
+        "Development outbox accepts fictional .test addresses only",
+      );
+    await mkdir(this.directory, { recursive: true, mode: 0o700 });
+    const actual = await realpath(this.directory);
+    if (
+      actual === resolve(".") ||
+      actual.startsWith(resolve(".") + "/") ||
+      ((await stat(actual)).mode & 0o077) !== 0
+    )
+      throw new Error(
+        "Development outbox must be a private directory outside the repository",
+      );
+    const id = randomUUID();
+    await writeFile(
+      join(this.directory, `${id}.json`),
+      JSON.stringify(message),
+      { mode: 0o600, flag: "wx" },
+    );
+    return { providerMessageId: id, accepted: true };
+  }
+  async health() {
+    return { status: "mock" };
+  }
+}
+
 export class TestEmailProvider extends EmailProvider {
   constructor() {
     super("test");
@@ -122,7 +168,10 @@ export class ProductionEmailAdapter extends EmailProvider {
 export function createEmailProvider({
   environment = process.env.NODE_ENV,
   provider = process.env.EMAIL_PROVIDER,
+  outboxDirectory = process.env.DEVELOPMENT_OUTBOX_DIR,
 } = {}) {
+  if (provider === "development_file" && environment !== "production")
+    return new DevelopmentFileEmailProvider(outboxDirectory);
   if (environment === "test") return new TestEmailProvider();
   if (environment !== "production" && (!provider || provider === "console"))
     return new DevelopmentConsoleEmailProvider();

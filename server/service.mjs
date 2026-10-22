@@ -206,6 +206,49 @@ export class MonaService {
       ? user
       : null;
   }
+  async ownProfile(actor) {
+    const row = await this.store.getOwnProfile(actor.id);
+    return {
+      displayName: row?.displayName ?? "",
+      pronouns: row?.pronouns ?? "",
+      locale: row?.locale ?? "en",
+    };
+  }
+  async saveOwnProfile(actor, input) {
+    const value = objectInput(input, ["displayName", "pronouns", "locale"]);
+    const displayName = requiredString(
+      value.displayName,
+      "Display name",
+      80,
+    ).trim();
+    if (!displayName)
+      throw Object.assign(new Error("Display name is required"), {
+        statusCode: 400,
+      });
+    const pronouns = value.pronouns ?? "";
+    if (typeof pronouns !== "string" || pronouns.length > 40)
+      throw Object.assign(new Error("Pronouns must be at most 40 characters"), {
+        statusCode: 400,
+      });
+    let locale;
+    try {
+      if (
+        typeof (value.locale ?? "en") !== "string" ||
+        (value.locale ?? "en").length > 35
+      )
+        throw new Error();
+      locale = globalThis.Intl.getCanonicalLocales(value.locale ?? "en")[0];
+      if (!locale) throw new Error();
+    } catch {
+      throw Object.assign(new Error("Invalid locale"), { statusCode: 400 });
+    }
+    await this.store.upsertProfile(actor.id, {
+      displayName,
+      pronouns: pronouns.trim(),
+      locale,
+    });
+    return this.ownProfile(actor);
+  }
   async approveRole(actor, userId, role, reason) {
     requireAnyRole(actor, ["administrator"]);
     if (!PRIVILEGED_ROLES.has(role) || !reason)

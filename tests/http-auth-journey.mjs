@@ -13,7 +13,12 @@ export async function httpAuthJourney({ admin, user, otherUser, password }) {
   const port = reservation.address().port;
   await new Promise((resolve) => reservation.close(resolve));
   const child = spawn(process.execPath, ["server/index.mjs"], {
-    env: { ...process.env, API_HOST: "127.0.0.1", API_PORT: String(port) },
+    env: {
+      ...process.env,
+      API_HOST: "127.0.0.1",
+      API_PORT: String(port),
+      SYNTHETIC_PATIENT_JOURNEY_ENABLED: "true",
+    },
     stdio: ["ignore", "pipe", "pipe"],
   });
   const exited = once(child, "exit");
@@ -45,6 +50,17 @@ export async function httpAuthJourney({ admin, user, otherUser, password }) {
     }
     assert.equal(ready, true, "Test API must become ready");
     assert.equal((await request("/v1/auth/sessions")).status, 401);
+    assert.equal((await request("/v1/profile")).status, 401);
+    assert.equal((await request("/v1/auth/me")).status, 401);
+    assert.equal(
+      (
+        await request(
+          "/v1/auth/register",
+          json({ email: "real@example.com", password }),
+        )
+      ).status,
+      400,
+    );
     assert.equal(
       (
         await request(
@@ -66,6 +82,83 @@ export async function httpAuthJourney({ admin, user, otherUser, password }) {
     const sessions = await request("/v1/auth/sessions", { headers });
     assert.equal(sessions.status, 200);
     assert.match(sessions.headers.get("cache-control"), /no-store/);
+    const me = await request("/v1/auth/me", { headers });
+    assert.equal(me.status, 200);
+    const meBody = await me.json();
+    assert.deepEqual(Object.keys(meBody).sort(), [
+      "csrfToken",
+      "expiresAt",
+      "user",
+    ]);
+    assert.deepEqual(Object.keys(meBody.user).sort(), ["id", "roles"]);
+    assert.equal(meBody.user.id, user.id);
+    const rehydrated = await Promise.all([
+      request("/v1/auth/me", { headers }),
+      request("/v1/auth/me", { headers }),
+    ]);
+    for (const response of rehydrated)
+      assert.equal((await response.json()).csrfToken, csrfToken);
+    const emptyProfile = await request("/v1/profile", { headers });
+    assert.deepEqual(await emptyProfile.json(), {
+      profile: { displayName: "", pronouns: "", locale: "en" },
+    });
+    const update = {
+      displayName: "Synthetic HTTP Alice",
+      pronouns: "they/them",
+      locale: "en",
+    };
+    const put = async (body, token = csrfToken) =>
+      request("/v1/profile", {
+        method: "PUT",
+        headers: {
+          ...headers,
+          "content-type": "application/json",
+          ...(token ? { "x-csrf-token": token } : {}),
+        },
+        body: JSON.stringify(body),
+      });
+    assert.equal((await put(update, null)).status, 403);
+    assert.equal((await put({ ...update, userId: otherUser.id })).status, 400);
+    assert.equal(
+      (await put({ ...update, roles: ["administrator"] })).status,
+      400,
+    );
+    assert.equal(
+      (await put({ ...update, locale: "invalid locale" })).status,
+      400,
+    );
+    assert.equal((await put(update)).status, 200);
+    assert.deepEqual(await (await request("/v1/profile", { headers })).json(), {
+      profile: update,
+    });
+    assert.equal(
+      (await request(`/v1/profile?userId=${otherUser.id}`, { headers })).status,
+      200,
+    );
+    const otherLogin = await request(
+      "/v1/auth/sign-in",
+      json({ email: otherUser.email, password }),
+    );
+    assert.equal(otherLogin.status, 200);
+    const otherHeaders = {
+      cookie: otherLogin.headers.get("set-cookie").split(";")[0],
+    };
+    assert.deepEqual(
+      await (
+        await request(`/v1/profile?userId=${user.id}`, {
+          headers: otherHeaders,
+        })
+      ).json(),
+      { profile: { displayName: "", pronouns: "", locale: "en" } },
+    );
+    assert.equal(
+      (
+        await request("/v1/profile", {
+          headers: { ...headers, origin: "https://attacker.invalid" },
+        })
+      ).status,
+      403,
+    );
     const ownSession = (await sessions.json()).sessions[0];
     assert.ok(ownSession.id);
     assert.equal(
@@ -100,6 +193,8 @@ export async function httpAuthJourney({ admin, user, otherUser, password }) {
       user.id,
     ]);
     assert.equal((await request("/v1/auth/sessions", { headers })).status, 401);
+    assert.equal((await request("/v1/profile", { headers })).status, 401);
+    assert.equal((await put(update)).status, 401);
     await admin.query("UPDATE users SET status='active' WHERE id=$1", [
       user.id,
     ]);
@@ -114,6 +209,7 @@ export async function httpAuthJourney({ admin, user, otherUser, password }) {
     await admin.query("UPDATE users SET status='active' WHERE id=$1", [
       user.id,
     ]);
+    await admin.query("DELETE FROM profiles WHERE user_id=$1", [user.id]);
     child.kill("SIGTERM");
     const timer = setTimeout(() => child.kill("SIGKILL"), 5000);
     try {

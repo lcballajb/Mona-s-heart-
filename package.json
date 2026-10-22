@@ -17,7 +17,8 @@
     "db:version": "node scripts/migrate.mjs --version",
     "start:api": "node server/index.mjs",
     "start:worker": "node server/worker-entry.mjs",
-    "prepare": "node scripts/prepare.mjs"
+    "prepare": "node scripts/prepare.mjs",
+    "test:browser": "node tests/browser-onboarding.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "4.3.4",
@@ -33,6 +34,7 @@
     "@types/react": "18.3.18",
     "@types/react-dom": "18.3.5",
     "eslint": "10.2.1",
+    "playwright": "1.56.1",
     "prettier": "3.8.3"
   },
   "engines": {

@@ -1699,3 +1699,41 @@ button:disabled {
     min-height: 44px;
   }
 }
+
+.synthetic-banner {
+  padding: 0.75rem 1rem;
+  border: 1px solid #d9e4df;
+  border-radius: 0.75rem;
+  background: #f2f7f4;
+  color: #244a3c;
+}
+button.logout {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+@media (max-width: 760px) {
+  .app > aside:not(.show) {
+    visibility: hidden;
+  }
+  .app > aside.show {
+    visibility: visible;
+  }
+}
+.welcome > div {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.page > .narrow {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}

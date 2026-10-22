@@ -14,6 +14,7 @@ import { loadApiConfig } from "./config.mjs";
 import { createShutdown } from "./shutdown.mjs";
 import { createLogger, Observability } from "./observability.mjs";
 import { parseCookies, readJsonBody } from "./http-request.mjs";
+import { normalizedEmail } from "./validation.mjs";
 
 const config = loadApiConfig();
 const store = await createStore();
@@ -94,7 +95,15 @@ const server = http.createServer(async (request, response) => {
       return reply(response, 200, result);
     }
     if (request.method === "POST" && path === "/v1/auth/register") {
-      await service.register(await readJsonBody(request));
+      const input = await readJsonBody(request);
+      if (
+        config.syntheticPatientJourney &&
+        !normalizedEmail(input?.email).endsWith(".test")
+      )
+        return reply(response, 400, {
+          error: "Use a fictional .test email address",
+        });
+      await service.register(input);
       return reply(response, 202, { status: "verification_pending" });
     }
     if (request.method === "POST" && path === "/v1/auth/verify")
@@ -129,16 +138,47 @@ const server = http.createServer(async (request, response) => {
         },
       );
     }
+    const journeyRoute = path === "/v1/auth/me" || path === "/v1/profile";
+    if (journeyRoute && !config.syntheticPatientJourney)
+      return reply(response, 503, {
+        error: "Synthetic patient journey is disabled",
+      });
     const sessionToken = parseCookies(request.headers.cookie).mh_session;
     const actor = await service.actor(sessionToken);
     if (!actor)
       return reply(response, 401, { error: "Authentication required" });
+    if (journeyRoute && !actor.email.endsWith(".test"))
+      return reply(response, 403, { error: "Synthetic accounts only" });
+    if (request.method === "GET" && path === "/v1/auth/me") {
+      const csrfToken = await store.restoreSessionCsrf(sessionToken);
+      if (!csrfToken)
+        return reply(response, 401, { error: "Authentication required" });
+      const currentSession = await store.session(sessionToken);
+      if (!currentSession)
+        return reply(response, 401, { error: "Authentication required" });
+      return reply(response, 200, {
+        user: { id: actor.id, roles: actor.roles },
+        csrfToken,
+        expiresAt: currentSession.expiresAt,
+      });
+    }
     const session = await store.session(sessionToken);
+    if (!session)
+      return reply(response, 401, { error: "Authentication required" });
     if (
       !["GET", "HEAD"].includes(request.method) &&
       !(await store.validateCsrf(session, request.headers["x-csrf-token"]))
     )
       return reply(response, 403, { error: "CSRF validation failed" });
+    if (request.method === "GET" && path === "/v1/profile")
+      return reply(response, 200, { profile: await service.ownProfile(actor) });
+    if (request.method === "PUT" && path === "/v1/profile")
+      return reply(response, 200, {
+        profile: await service.saveOwnProfile(
+          actor,
+          await readJsonBody(request),
+        ),
+      });
     if (request.method === "POST" && path === "/v1/auth/sign-out") {
       await service.signOut(sessionToken);
       return reply(

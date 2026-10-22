@@ -77,3 +77,25 @@ test("production accepts a structurally valid deployment configuration", () => {
   assert.equal(config.production, true);
   assert.deepEqual(config.trustedProxies, ["10.0.0.1", "10.0.0.2"]);
 });
+
+test("synthetic patient journey defaults off and rejects production startup", () => {
+  assert.equal(
+    loadApiConfig({ NODE_ENV: "test" }).syntheticPatientJourney,
+    false,
+  );
+  assert.equal(
+    loadApiConfig({
+      NODE_ENV: "test",
+      SYNTHETIC_PATIENT_JOURNEY_ENABLED: "true",
+    }).syntheticPatientJourney,
+    true,
+  );
+  assert.throws(
+    () =>
+      loadApiConfig({
+        NODE_ENV: "production",
+        SYNTHETIC_PATIENT_JOURNEY_ENABLED: "true",
+      }),
+    /Synthetic patient journey cannot be enabled in production/,
+  );
+});
