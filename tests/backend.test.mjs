@@ -209,6 +209,68 @@ test("export is scoped and deletion deactivates credentials and sessions with au
   assert.equal(store.audits.at(-1).type, "deletion_request");
 });
 
+test("account deletion is actor-derived, idempotent, revokes credentials, and removes private data", async () => {
+  const { store, service } = await fixture();
+  const alice = await active(service, store, "delete-alice@example.test");
+  const bob = await active(service, store, "delete-bob@example.test");
+  const login = await service.signIn({
+    email: alice.email,
+    password: "correct horse battery staple",
+  });
+  store.createAccountToken(alice.id, "password_reset", "recovery", 60_000);
+  store.upsertProfile(alice.id, { displayName: "Private Alice" });
+  store.createHealthEntry(alice.id, { kind: "condition", label: "private" });
+  store.createNotification(alice.id, "private", { secret: true });
+  store.createImportedRecordMetadata(alice.id, {
+    source: "private",
+    payloadCiphertext: "private",
+  });
+
+  const first = await service.deleteAccount(alice, {
+    userId: bob.id,
+    ownerId: bob.id,
+    accountId: bob.id,
+  });
+  const duplicate = await service.deleteAccount(alice);
+  assert.equal(duplicate.id, first.id);
+  assert.equal(
+    store.jobs.filter((job) => job.kind === "account_deletion").length,
+    1,
+  );
+  assert.equal(await service.actor(login.token), null);
+  assert.equal(store.activeAccountToken("password_reset", "recovery"), null);
+  assert.equal(bob.status, "active");
+
+  assert.throws(
+    () => store.completeDeletionRequest(first.id),
+    /not executable/,
+  );
+  first.coolingOffUntil = store.now();
+  store.completeDeletionRequest(first.id);
+  assert.equal(alice.status, "deleted");
+  assert.equal(store.profiles.has(alice.id), false);
+  assert.equal(
+    store.healthEntries.some((row) => row.userId === alice.id),
+    false,
+  );
+  assert.equal(
+    store.notifications.some((row) => row.userId === alice.id),
+    false,
+  );
+  assert.equal(
+    store.importedRecords.some((row) => row.userId === alice.id),
+    false,
+  );
+  assert.equal(store.completeDeletionRequest(first.id), true);
+  assert.deepEqual(
+    store.audits
+      .filter((event) => event.subjectId === alice.id)
+      .slice(-3)
+      .map((event) => event.type),
+    ["deletion_request", "deletion_started", "deletion_completed"],
+  );
+});
+
 test("blocks and reports preserve actor scope", async () => {
   const { store, service } = await fixture();
   const alice = await active(service, store, "reporter@example.test");
@@ -315,4 +377,40 @@ test("existing sessions reject inactive and unverified accounts", async () => {
   user.deletedAt = null;
   store.users.delete(user.id);
   assert.equal(await service.actor(login.token), null);
+});
+
+test("memory deletion preserves protected states and removes report relationships", async () => {
+  const { store, service } = await fixture();
+  const alice = await active(service, store, "memory-delete@example.test");
+  const bob = await active(service, store, "memory-other@example.test");
+  store.createBlock(alice.id, bob.id);
+  store.createBlock(bob.id, alice.id);
+  const own = store.createReport(alice.id, bob.id, "synthetic");
+  own.id = "synthetic-report";
+  store.moderationActions.push({ reportId: own.id });
+  const other = store.createReport(bob.id, alice.id, "synthetic");
+  const request = await service.deleteAccount(alice);
+  for (const state of ["cancelled", "legal_hold"]) {
+    request.status = state;
+    for (let attempt = 0; attempt < 2; attempt++)
+      assert.throws(
+        () => store.completeDeletionRequest(request.id),
+        /not executable/,
+      );
+    assert.equal(request.status, state);
+  }
+  request.status = "cooling_off";
+  request.coolingOffUntil = store.now();
+  request.legalHold = true;
+  assert.throws(
+    () => store.completeDeletionRequest(request.id),
+    /not executable/,
+  );
+  request.legalHold = false;
+  store.completeDeletionRequest(request.id);
+  assert.equal(store.blocks.length, 0);
+  assert.equal(store.reports.includes(own), false);
+  assert.equal(other.subjectId, null);
+  assert.equal(store.moderationActions[0].reportId, null);
+  assert.equal(bob.status, "active");
 });

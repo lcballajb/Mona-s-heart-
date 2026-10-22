@@ -114,3 +114,9 @@ test("PostgreSQL user-scoped operations fail closed on a mismatched transaction"
     (error) => error.code === "RLS_CONTEXT_MISMATCH",
   );
 });
+
+test("adapters missing deletion completion fail before accepting worker jobs", () => {
+  const adapter = new MemoryStore();
+  adapter.completeDeletionRequest = undefined;
+  assert.throws(() => assertStoreContract(adapter), /completeDeletionRequest/);
+});

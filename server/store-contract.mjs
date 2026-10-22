@@ -9,6 +9,7 @@ export const STORE_OPERATIONS = Object.freeze([
   "claimJobs",
   "clearLoginFailures",
   "completeJob",
+  "completeDeletionRequest",
   "completeEmailVerification",
   "completePasswordReset",
   "consumeAccountToken",
