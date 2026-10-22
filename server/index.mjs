@@ -174,7 +174,6 @@ const server = http.createServer(async (request, response) => {
     logger.error("http_request_failed", {
       requestId,
       method: request.method,
-      path,
       statusCode: error.statusCode ?? 500,
       errorType: error.name,
     });

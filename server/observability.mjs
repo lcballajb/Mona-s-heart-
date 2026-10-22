@@ -1,11 +1,28 @@
 import { createHash, randomUUID } from "node:crypto";
 
-const FORBIDDEN_KEYS =
-  /password|token|secret|connection|string|diagnosis|medication|symptom|lab|document|message|prompt|content/i;
+// Ordinary telemetry accepts only bounded scalar operational fields. Never pass
+// raw paths, URLs, arbitrary payloads, or nested objects to a sink.
+const OPERATIONAL_FIELDS = new Set([
+  "requestId",
+  "method",
+  "statusCode",
+  "errorType",
+  "kind",
+  "correlationId",
+  "signal",
+  "status",
+  "failureCount",
+]);
 export function redact(fields = {}) {
   return Object.fromEntries(
     Object.entries(fields)
-      .filter(([key]) => !FORBIDDEN_KEYS.test(key))
+      .filter(
+        ([key, value]) =>
+          OPERATIONAL_FIELDS.has(key) &&
+          (typeof value === "string" ||
+            typeof value === "boolean" ||
+            (typeof value === "number" && Number.isFinite(value))),
+      )
       .map(([key, value]) => [
         key,
         typeof value === "string" && value.length > 200

@@ -29,7 +29,7 @@ import {
   clientAddress,
   securityHeaders,
 } from "../server/http-security.mjs";
-import { redact } from "../server/observability.mjs";
+import { createLogger, Metrics, redact } from "../server/observability.mjs";
 
 const owner = { id: "11111111-1111-4111-8111-111111111111" };
 const checksum = "a".repeat(64);
@@ -401,5 +401,38 @@ test("failed credential operations leave account tokens available for retry", as
       password: "replacement password is sufficiently long",
     }),
     { status: "password_updated" },
+  );
+});
+
+test("ordinary logs and metric labels reject unapproved and nested data", () => {
+  const circular = {};
+  circular.self = circular;
+  const fields = {
+    requestId: "safe-request",
+    statusCode: 500,
+    path: "/private/synthetic-health-record",
+    email: "fictional@example.test",
+    metadata: { diagnosis: "synthetic diagnosis", token: "synthetic token" },
+    details: [{ password: "synthetic password" }],
+    status: { content: "nested sensitive content" },
+    kind: ["synthetic diagnosis"],
+    extra: circular,
+  };
+  assert.deepEqual(redact(fields), {
+    requestId: "safe-request",
+    statusCode: 500,
+  });
+  const lines = [];
+  createLogger((line) => lines.push(line)).error("http_request_failed", fields);
+  const record = JSON.parse(lines[0]);
+  assert.equal(record.event, "http_request_failed");
+  assert.equal(record.statusCode, 500);
+  assert.doesNotMatch(lines[0], /synthetic|fictional|private|metadata|details/);
+  const metrics = new Metrics();
+  metrics.increment("requests", fields);
+  metrics.observe("latency", 10, fields);
+  assert.doesNotMatch(
+    JSON.stringify([...metrics.values]),
+    /synthetic|fictional|private/,
   );
 });

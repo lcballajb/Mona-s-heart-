@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import process from "node:process";
+import { httpAuthJourney } from "./http-auth-journey.mjs";
 
 const url = process.env.TEST_DATABASE_URL;
 const adminUrl = process.env.DB_ADMIN_URL;
@@ -322,6 +323,47 @@ test(
         password: "correct horse battery staple",
       });
       assert.ok(await store.session(login.token));
+      for (const status of [
+        "deactivated",
+        "deletion_pending",
+        "deleted",
+        "pending_verification",
+      ]) {
+        await admin.query("UPDATE users SET status=$2 WHERE id=$1", [
+          registration.userId,
+          status,
+        ]);
+        assert.equal(await service.actor(login.token), null, status);
+      }
+      await admin.query(
+        "UPDATE users SET status='active', email_verified_at=NULL WHERE id=$1",
+        [registration.userId],
+      );
+      assert.equal(await service.actor(login.token), null);
+      await admin.query(
+        "UPDATE users SET email_verified_at=now() WHERE id=$1",
+        [registration.userId],
+      );
+      assert.equal((await service.actor(login.token)).id, registration.userId);
+
+      await admin.query("UPDATE users SET deleted_at=now() WHERE id=$1", [
+        registration.userId,
+      ]);
+      assert.equal(await service.actor(login.token), null);
+      await admin.query("UPDATE users SET deleted_at=NULL WHERE id=$1", [
+        registration.userId,
+      ]);
+      await store.createSession(
+        secondRegistration.userId,
+        `http-other-${suffix}`,
+        60_000,
+      );
+      await httpAuthJourney({
+        admin,
+        user: persisted,
+        otherUser: { id: secondRegistration.userId },
+        password: "correct horse battery staple",
+      });
       await service.signOut(login.token);
       assert.equal(await store.session(login.token), null);
       const actor = await store.findUserById(registration.userId);

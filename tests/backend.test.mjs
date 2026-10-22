@@ -287,3 +287,32 @@ test("password change verifies the credential, revokes sessions, and notifies th
   assert.equal(await service.actor(login.token), null);
   assert.equal(messages.at(-1).template.kind, "security_alert");
 });
+
+test("existing sessions reject inactive and unverified accounts", async () => {
+  const { store, service } = await fixture();
+  const user = await active(service, store, "status-boundary@example.test");
+  const login = await service.signIn({
+    email: user.email,
+    password: "correct horse battery staple",
+  });
+  const verifiedAt = user.verifiedAt;
+  for (const status of [
+    "deactivated",
+    "deletion_pending",
+    "deleted",
+    "pending_verification",
+  ]) {
+    user.status = status;
+    assert.equal(await service.actor(login.token), null, status);
+  }
+  user.status = "active";
+  user.verifiedAt = null;
+  assert.equal(await service.actor(login.token), null);
+  user.verifiedAt = verifiedAt;
+  assert.equal((await service.actor(login.token)).id, user.id);
+  user.deletedAt = store.now();
+  assert.equal(await service.actor(login.token), null);
+  user.deletedAt = null;
+  store.users.delete(user.id);
+  assert.equal(await service.actor(login.token), null);
+});
