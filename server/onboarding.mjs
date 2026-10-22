@@ -40,7 +40,13 @@ export function validateOnboarding(actor, input) {
   };
   for (const field of [...fields, "supportPreferences"]) {
     const text = value[field] ?? "";
-    if (typeof text !== "string" || text.length > 1000) invalid();
+    if (
+      typeof text !== "string" ||
+      text.length > 1000 ||
+      !text.isWellFormed() ||
+      /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(text)
+    )
+      invalid();
     result[field] = text.trim();
   }
   for (const flag of flags) {

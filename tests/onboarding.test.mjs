@@ -47,6 +47,8 @@ test("role-specific onboarding persists privately and rejects unauthorized field
       { ...onboarding, consent: false },
       { ...onboarding, userId: "other" },
       { ...onboarding, privacy: "public" },
+      { ...onboarding, supportPreferences: "invalid\u0000text" },
+      { ...onboarding, supportPreferences: "\ud800" },
       { ...onboarding, supportPreferences: "x".repeat(1001) },
       { ...onboarding, consentVersion: "old" },
       { ...onboarding, matchingConsent: "true" },

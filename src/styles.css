@@ -1739,6 +1739,7 @@ button:disabled {
 }
 
 .onboard fieldset {
+  grid-column: 1 / -1;
   min-width: 0;
   border: 1px solid #ddd;
   border-radius: 12px;

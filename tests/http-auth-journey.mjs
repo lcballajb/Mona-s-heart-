@@ -155,6 +155,15 @@ export async function httpAuthJourney({ admin, user, otherUser, password }) {
       400,
     );
     assert.equal((await put({ ...update, onboarding })).status, 200);
+    assert.equal(
+      (
+        await put({
+          ...update,
+          onboarding: { ...onboarding, symptoms: "\u0000" },
+        })
+      ).status,
+      400,
+    );
     const persistedProfile = (
       await (await request("/v1/profile", { headers })).json()
     ).profile;
