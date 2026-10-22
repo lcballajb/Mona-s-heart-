@@ -525,6 +525,56 @@ function Dashboard() {
           </Link>
         </div>
         <section className="narrow">
+          <h2>Your onboarding</h2>
+          <p>
+            {state.profile?.onboarding?.completedAt
+              ? "Onboarding complete. Your details are saved privately."
+              : "Onboarding incomplete. Complete your profile to save your preferences."}
+          </p>
+          {state.profile?.onboarding && (
+            <dl>
+              {Object.entries(state.profile.onboarding)
+                .filter(
+                  ([key, value]) =>
+                    [
+                      "accountType",
+                      "diagnosis",
+                      "symptoms",
+                      "medications",
+                      "livedExperience",
+                      "availability",
+                      "caregiverInformation",
+                      "supportPreferences",
+                      "privacy",
+                    ].includes(key) && value,
+                )
+                .map(([key, value]) => (
+                  <React.Fragment key={key}>
+                    <dt>
+                      {(
+                        {
+                          accountType: "Account type",
+                          livedExperience: "Lived experience",
+                          caregiverInformation: "Caregiver information",
+                          supportPreferences: "Support preferences",
+                        } as Record<string, string>
+                      )[key] ?? key[0].toUpperCase() + key.slice(1)}
+                    </dt>
+                    <dd>{String(value)}</dd>
+                  </React.Fragment>
+                ))}
+              {state.profile.onboarding.accountType === "survivor" && (
+                <>
+                  <dt>Matching consent</dt>
+                  <dd>
+                    {state.profile.onboarding.matchingConsent
+                      ? "Recorded; matching is not enabled"
+                      : "Not granted"}
+                  </dd>
+                </>
+              )}
+            </dl>
+          )}
           <h2>Your next connection</h2>
           <p>
             Survivor discovery, matching, messaging and support groups are not

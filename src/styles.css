@@ -1737,3 +1737,28 @@ button:disabled {
   max-width: 100%;
   overflow-wrap: anywhere;
 }
+
+.onboard fieldset {
+  min-width: 0;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+.onboard textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  border: 1px solid #aaa;
+  border-radius: 8px;
+  padding: 0.7rem;
+  resize: vertical;
+}
+.onboard input[type="checkbox"] {
+  width: auto;
+}
+.narrow dd {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

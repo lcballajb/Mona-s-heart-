@@ -1,3 +1,4 @@
+import { validateOnboarding } from "./onboarding.mjs";
 import {
   hashPassword,
   verifyPassword,
@@ -212,10 +213,16 @@ export class MonaService {
       displayName: row?.displayName ?? "",
       pronouns: row?.pronouns ?? "",
       locale: row?.locale ?? "en",
+      ...(row?.onboarding ? { onboarding: row.onboarding } : {}),
     };
   }
   async saveOwnProfile(actor, input) {
-    const value = objectInput(input, ["displayName", "pronouns", "locale"]);
+    const value = objectInput(input, [
+      "displayName",
+      "pronouns",
+      "locale",
+      "onboarding",
+    ]);
     const displayName = requiredString(
       value.displayName,
       "Display name",
@@ -244,6 +251,9 @@ export class MonaService {
     }
     await this.store.upsertProfile(actor.id, {
       displayName,
+      ...(value.onboarding === undefined
+        ? {}
+        : { onboarding: validateOnboarding(actor, value.onboarding) }),
       pronouns: pronouns.trim(),
       locale,
     });

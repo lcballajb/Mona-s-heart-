@@ -1,4 +1,21 @@
+export type OnboardingDTO = {
+  accountType?: string;
+  completedAt?: string;
+  diagnosis?: string;
+  symptoms?: string;
+  medications?: string;
+  livedExperience?: string;
+  availability?: string;
+  caregiverInformation?: string;
+  supportPreferences: string;
+  willingToMentor?: boolean;
+  matchingConsent?: boolean;
+  privacy: "private";
+  consentVersion: "synthetic-onboarding-v1";
+  consent?: boolean;
+};
 export type ProfileDTO = {
+  onboarding?: OnboardingDTO;
   displayName: string;
   pronouns: string;
   locale: string;
