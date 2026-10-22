@@ -286,3 +286,6 @@ This inventory is the navigation reference used by the orphan/link check. Inclus
 - [Vulnerable user protections](trust-safety/VULNERABLE_USER_PROTECTIONS.md)
 
 - [Phase 2 security, stability, and beta readiness](engineering/PHASE_2_BETA_READINESS.md)
+
+- [PR reconciliation report](engineering/PR_RECONCILIATION_REPORT.md)
+- [Authenticated patient journey implementation contract](engineering/AUTHENTICATED_PATIENT_JOURNEY.md)
