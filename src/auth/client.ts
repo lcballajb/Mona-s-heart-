@@ -33,6 +33,7 @@ export class PatientClient {
     body?: unknown,
     publicRequest = false,
   ): Promise<T> {
+    const requestGeneration = this.generation;
     let response: Response;
     try {
       response = await fetch(`/v1${path}`, {
@@ -52,7 +53,11 @@ export class PatientClient {
       throw new ApiError(0, "Connection unavailable. Please try again.");
     }
     if (!response.ok) {
-      if (response.status === 401 && !publicRequest) {
+      if (
+        response.status === 401 &&
+        !publicRequest &&
+        requestGeneration === this.generation
+      ) {
         this.clear();
         this.onExpired();
       }

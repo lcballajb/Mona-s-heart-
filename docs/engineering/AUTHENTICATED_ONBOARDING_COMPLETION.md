@@ -76,8 +76,11 @@ reset. Remove the private outbox after use. Production email is not implemented.
 ## Verification
 
 - Focused profile and CSRF tests initially failed because the required operations
-  were absent, then passed after implementation.
-- `npm test`: 71 pass, zero failures/skips with disposable PostgreSQL 16.15 and a
+  were absent, then passed after implementation. A separate deferred-response
+  regression demonstrated that an old 401 could clear newer client state;
+  generation-checking unauthorized callbacks fixes that race. The regression
+  failed before the fix and passes afterward.
+- `npm test`: 73 pass, zero failures/skips with disposable PostgreSQL 16.15 and a
   restricted runtime identity. Includes real HTTP own-profile CRUD, anonymous
   denial, cross-user isolation, mass-assignment rejection, origin/CSRF denial,
   inactive account denial, private outbox permissions, production rejection and
