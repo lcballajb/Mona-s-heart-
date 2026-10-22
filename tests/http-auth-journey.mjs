@@ -164,6 +164,23 @@ export async function httpAuthJourney({ admin, user, otherUser, password }) {
       ).status,
       400,
     );
+    const maximumUnicode = {
+      ...onboarding,
+      diagnosis: "界".repeat(1000),
+      symptoms: "界".repeat(1000),
+      medications: "界".repeat(1000),
+      supportPreferences: "界".repeat(1000),
+    };
+    assert.equal(
+      (await put({ ...update, onboarding: maximumUnicode })).status,
+      200,
+    );
+    assert.equal(
+      (await (await request("/v1/profile", { headers })).json()).profile
+        .onboarding.medications,
+      maximumUnicode.medications,
+    );
+    assert.equal((await put({ ...update, onboarding })).status, 200);
     const persistedProfile = (
       await (await request("/v1/profile", { headers })).json()
     ).profile;
