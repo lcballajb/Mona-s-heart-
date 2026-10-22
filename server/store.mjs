@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { tokenDigest } from "./security.mjs";
+import { tokenDigest, sessionCsrfToken } from "./security.mjs";
 
 export class MemoryStore {
   constructor(clock = () => new Date(), { sessionPepper = "" } = {}) {
@@ -75,7 +75,7 @@ export class MemoryStore {
       id: randomUUID(),
       userId,
       digest: tokenDigest(rawToken, this.sessionPepper),
-      csrfToken: randomUUID(),
+      csrfToken: sessionCsrfToken(rawToken),
       createdAt: this.now(),
       expiresAt: new Date(this.clock().getTime() + ttlMs).toISOString(),
       revokedAt: null,
@@ -94,7 +94,21 @@ export class MemoryStore {
     return found;
   }
   validateCsrf(session, rawToken) {
-    return session.csrfToken === rawToken;
+    return Boolean(
+      session &&
+      !session.revokedAt &&
+      Date.parse(session.expiresAt) > this.clock().getTime() &&
+      session.csrfToken === rawToken,
+    );
+  }
+  restoreSessionCsrf(rawToken) {
+    const session = this.session(rawToken);
+    if (!session) return null;
+    session.csrfToken = sessionCsrfToken(rawToken);
+    return session.csrfToken;
+  }
+  getOwnProfile(userId) {
+    return this.profiles.get(userId) ?? null;
   }
   createAccountToken(userId, purpose, rawToken, ttlMs) {
     const user = this.findUserById(userId);

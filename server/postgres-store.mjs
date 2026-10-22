@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { tokenDigest } from "./security.mjs";
+import { tokenDigest, sessionCsrfToken } from "./security.mjs";
 import { databaseMetrics, timedQuery } from "./database.mjs";
 
 const iso = (value) => (value ? new Date(value).toISOString() : null);
@@ -232,7 +232,7 @@ export class PostgresStore {
     );
   }
   async createSession(userId, rawToken, ttlMs) {
-    const csrfToken = randomUUID();
+    const csrfToken = sessionCsrfToken(rawToken);
     const { rows } = await this.query(
       `INSERT INTO sessions(user_id,token_digest,csrf_digest,expires_at) VALUES($1,decode($2,'hex'),decode($3,'hex'),$4) RETURNING *`,
       [
@@ -253,7 +253,7 @@ export class PostgresStore {
   }
   async updatePassword(id, passwordHash) {
     const { rows } = await this.query(
-      "UPDATE users SET password_hash=$2,password_algorithm='scrypt-v1',updated_at=now() WHERE id=$1 RETURNING *, ARRAY(SELECT role_code FROM user_roles WHERE user_id=$1) AS roles",
+      "UPDATE users SET password_hash=$2,password_algorithm='scrypt-v1' WHERE id=$1 RETURNING *, ARRAY(SELECT role_code FROM user_roles WHERE user_id=$1) AS roles",
       [id, passwordHash],
     );
     return mapUser(rows[0]);
@@ -276,11 +276,38 @@ export class PostgresStore {
       : null;
   }
   async validateCsrf(session, rawToken) {
+    if (!session) return false;
     const { rows } = await this.query(
-      "SELECT 1 FROM sessions WHERE id=$1 AND csrf_digest=decode($2,'hex')",
+      "SELECT 1 FROM sessions WHERE id=$1 AND revoked_at IS NULL AND expires_at>now() AND csrf_digest=decode($2,'hex')",
       [session.id, tokenDigest(rawToken ?? "")],
     );
     return Boolean(rows[0]);
+  }
+  async restoreSessionCsrf(rawToken) {
+    if (!rawToken) return null;
+    const csrfToken = sessionCsrfToken(rawToken);
+    const { rowCount } = await this.query(
+      `UPDATE sessions SET csrf_digest=decode($2,'hex')
+       WHERE token_digest=decode($1,'hex') AND revoked_at IS NULL AND expires_at>now()`,
+      [tokenDigest(rawToken, this.sessionPepper), tokenDigest(csrfToken)],
+    );
+    return rowCount === 1 ? csrfToken : null;
+  }
+  async getOwnProfile(userId) {
+    return this.asUser(userId, async (tx) => {
+      const { rows } = await tx.query(
+        "SELECT display_name,pronouns,locale FROM profiles WHERE user_id=$1",
+        [userId],
+      );
+      const row = rows[0];
+      return row
+        ? {
+            displayName: row.display_name,
+            pronouns: row.pronouns,
+            locale: row.locale,
+          }
+        : null;
+    });
   }
   async revokeSession(rawToken) {
     await this.query(

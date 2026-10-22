@@ -353,6 +353,7 @@ test(
       await admin.query("UPDATE users SET deleted_at=NULL WHERE id=$1", [
         registration.userId,
       ]);
+      await service.verifyEmail(secondRegistration.verificationToken);
       await store.createSession(
         secondRegistration.userId,
         `http-other-${suffix}`,
@@ -361,7 +362,10 @@ test(
       await httpAuthJourney({
         admin,
         user: persisted,
-        otherUser: { id: secondRegistration.userId },
+        otherUser: {
+          id: secondRegistration.userId,
+          email: (await store.findUserById(secondRegistration.userId)).email,
+        },
         password: "correct horse battery staple",
       });
       await service.signOut(login.token);

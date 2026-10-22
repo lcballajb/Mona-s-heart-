@@ -48,6 +48,8 @@ import {
 import type { MedicationTerm, DiagnosisTerm } from "./health/terminology";
 import { DEFAULT_HEALTH_VISIBILITY } from "./features/privacy";
 import "./styles.css";
+import { SessionProvider, Protected, useSession } from "./auth/Session";
+import { AuthForm, TokenForm, PatientProfileForm } from "./auth/Screens";
 
 const emergency =
   "Mona’s Heart is not an emergency service. If you believe you are experiencing a medical emergency, call 911 or your local emergency number immediately.";
@@ -265,99 +267,24 @@ function Info({ n, title, text }: { n: string; title: string; text: string }) {
 }
 
 function Auth({ signup = false }: { signup?: boolean }) {
-  const navg = useNavigate();
-  const [forgot, setForgot] = useState(false);
   return (
     <Public>
-      <section className="auth">
-        <div>
-          <span className="eyebrow">A SAFE PLACE TO BEGIN</span>
-          <h1>
-            {forgot
-              ? "Reset your password"
-              : signup
-                ? "Create your account"
-                : "Welcome back"}
-          </h1>
-          <p>
-            {forgot
-              ? "Enter your email and we’ll send demo reset instructions."
-              : signup
-                ? "Start with only the details you feel comfortable sharing."
-                : "Continue your connections and conversations."}
-          </p>
-        </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            navg(signup ? "/onboarding" : "/dashboard");
-          }}
-        >
-          <h2>{forgot ? "Password help" : signup ? "Sign up" : "Log in"}</h2>
-          {signup && (
-            <label>
-              First name
-              <input required placeholder="Your first name" />
-            </label>
-          )}
-          <label>
-            Email address
-            <input required type="email" placeholder="you@example.com" />
-          </label>
-          {!forgot && (
-            <label>
-              Password
-              <input
-                required
-                type="password"
-                minLength={6}
-                placeholder="At least 6 characters"
-              />
-            </label>
-          )}
-          {signup && (
-            <label className="check">
-              <input required type="checkbox" /> I agree to use demo information
-              only.
-            </label>
-          )}
-          <button className="button wide">
-            {forgot
-              ? "Send reset link"
-              : signup
-                ? "Continue to onboarding"
-                : "Log in"}
-          </button>
-          {!signup && !forgot && (
-            <button
-              type="button"
-              className="textbutton"
-              onClick={() => setForgot(true)}
-            >
-              Forgot password?
-            </button>
-          )}
-          <div className="or">or</div>
-          <button
-            type="button"
-            className="button ghost wide"
-            onClick={() => navg("/dashboard")}
-          >
-            Enter with demo account
-          </button>
-          <p className="formfoot">
-            {signup ? "Already have an account?" : "New to Mona’s Heart?"}{" "}
-            <Link to={signup ? "/login" : "/signup"}>
-              {signup ? "Log in" : "Sign up"}
-            </Link>
-          </p>
-        </form>
-      </section>
+      <AuthForm key={signup ? "signup" : "login"} signup={signup} />
       <Disclaimer />
     </Public>
   );
 }
 function Onboarding() {
+  const { state } = useSession();
+  return state.status === "demo" ? (
+    <DemoOnboarding />
+  ) : (
+    <Public>
+      <PatientProfileForm />
+    </Public>
+  );
+}
+function DemoOnboarding() {
   const [step, setStep] = useState(1);
   const navg = useNavigate();
   const fields =
@@ -476,14 +403,21 @@ function AppShell({
   children: React.ReactNode;
 }) {
   const [mobile, setMobile] = useState(false);
+  const session = useSession();
+  const navigate = useNavigate();
+  const [logoutError, setLogoutError] = useState("");
   return (
     <div className="app">
       <aside className={mobile ? "show" : ""}>
         <Logo />
-        <button className="asideclose" onClick={() => setMobile(false)}>
+        <button
+          className="asideclose"
+          aria-label="Close menu"
+          onClick={() => setMobile(false)}
+        >
           <X />
         </button>
-        <nav>
+        <nav onClick={() => setMobile(false)}>
           {nav.map(([n, p]) => (
             <Link key={p} to={p}>
               {n}
@@ -498,13 +432,36 @@ function AppShell({
           <Link to="/notifications">Notifications</Link>
           <Link to="/settings">Settings</Link>
         </nav>
-        <Link className="logout" to="/">
-          <LogOut /> Log out
-        </Link>
+        <button
+          className="logout"
+          onClick={async () => {
+            try {
+              if (session.state.status === "demo") {
+                await session.refresh();
+                navigate("/login");
+              } else {
+                await session.logout();
+                navigate("/login");
+              }
+            } catch {
+              setLogoutError(
+                "Could not confirm logout. Retry the connection before continuing.",
+              );
+            }
+          }}
+        >
+          <LogOut /> {session.state.status === "demo" ? "Exit demo" : "Log out"}
+        </button>
+        {logoutError && <p role="alert">{logoutError}</p>}
       </aside>
       <div className="appmain">
         <div className="topbar">
-          <button className="menu" onClick={() => setMobile(true)}>
+          <button
+            className="menu"
+            aria-label="Open menu"
+            aria-expanded={mobile}
+            onClick={() => setMobile(true)}
+          >
             <Menu />
           </button>
           <h1>{title}</h1>
@@ -512,10 +469,23 @@ function AppShell({
             <Link to="/notifications" aria-label="Notifications">
               <Bell />
             </Link>
-            <span className="avatar mini">EP</span>
+            <span className="avatar mini">
+              {session.state.status === "demo"
+                ? "EP"
+                : (session.state.profile?.displayName ?? "?")
+                    .slice(0, 2)
+                    .toUpperCase()}
+            </span>
           </div>
         </div>
-        <div className="page">{children}</div>
+        <div className="page">
+          <p className="synthetic-banner" role="note">
+            {session.state.status === "demo"
+              ? "Demonstration — fictional examples; changes are not saved to an account."
+              : "Local synthetic account — no real patient information."}
+          </p>
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -530,6 +500,40 @@ const Emergency = () => (
   </div>
 );
 function Dashboard() {
+  const { state } = useSession();
+  if (state.status !== "demo")
+    return (
+      <AppShell title="Your home">
+        <div className="welcome">
+          <div>
+            <span className="eyebrow">YOUR PRIVATE PROFILE</span>
+            <h2>
+              Welcome
+              {state.profile?.displayName
+                ? `, ${state.profile.displayName}`
+                : ""}{" "}
+              <span>♥</span>
+            </h2>
+            <p>
+              {state.profile?.displayName
+                ? "Your profile is saved to your synthetic account."
+                : "Complete your private profile to begin."}
+            </p>
+          </div>
+          <Link className="button" to="/onboarding">
+            {state.profile?.displayName ? "Edit profile" : "Complete profile"}
+          </Link>
+        </div>
+        <section className="narrow">
+          <h2>Your next connection</h2>
+          <p>
+            Survivor discovery, matching, messaging and support groups are not
+            connected to this account yet. Your private profile will not be
+            shared through the demonstration screens.
+          </p>
+        </section>
+      </AppShell>
+    );
   return (
     <AppShell title="Your home">
       <div className="welcome">
@@ -2046,30 +2050,222 @@ function NotFound() {
     </Public>
   );
 }
+function DemoFeature({ children }: { children: React.ReactNode }) {
+  const { state } = useSession();
+  if (state.status === "demo") return <>{children}</>;
+  return (
+    <AppShell title="Not connected yet">
+      <section className="narrow">
+        <h2>This part of your journey is coming next</h2>
+        <p>
+          This feature is currently a demonstration and does not contain your
+          account data.
+        </p>
+        <Link className="button" to="/dashboard">
+          Return to your profile
+        </Link>
+      </section>
+    </AppShell>
+  );
+}
 function App() {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Auth />} />
       <Route path="/signup" element={<Auth signup />} />
-      <Route path="/onboarding" element={<Onboarding />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/matches" element={<Matches />} />
-      <Route path="/matches/:id" element={<Profile />} />
-      <Route path="/messages" element={<Messages />} />
-      <Route path="/messages/:id" element={<Conversation />} />
-      <Route path="/calls" element={<Calls />} />
-      <Route path="/call-room" element={<CallRoom />} />
-      <Route path="/documents" element={<Documents />} />
-      <Route path="/labs" element={<Labs />} />
-      <Route path="/notes" element={<Notes />} />
-      <Route path="/medications" element={<Medications />} />
-      <Route path="/timeline" element={<Timeline />} />
-      <Route path="/health-profile" element={<HealthProfile />} />
-      <Route path="/groups" element={<Groups />} />
-      <Route path="/groups/:name" element={<Group />} />
-      <Route path="/notifications" element={<Notifications />} />
-      <Route path="/settings" element={<Settings />} />
+      <Route
+        path="/verify"
+        element={
+          <Public>
+            <TokenForm />
+          </Public>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <Public>
+            <TokenForm reset />
+          </Public>
+        }
+      />
+      <Route
+        path="/onboarding"
+        element={
+          <Protected>
+            <Onboarding />
+          </Protected>
+        }
+      />
+      <Route
+        path="/dashboard"
+        element={
+          <Protected>
+            <Dashboard />
+          </Protected>
+        }
+      />
+      <Route
+        path="/matches"
+        element={
+          <Protected>
+            <DemoFeature>
+              <Matches />
+            </DemoFeature>
+          </Protected>
+        }
+      />
+      <Route
+        path="/matches/:id"
+        element={
+          <Protected>
+            <DemoFeature>
+              <Profile />
+            </DemoFeature>
+          </Protected>
+        }
+      />
+      <Route
+        path="/messages"
+        element={
+          <Protected>
+            <DemoFeature>
+              <Messages />
+            </DemoFeature>
+          </Protected>
+        }
+      />
+      <Route
+        path="/messages/:id"
+        element={
+          <Protected>
+            <DemoFeature>
+              <Conversation />
+            </DemoFeature>
+          </Protected>
+        }
+      />
+      <Route
+        path="/calls"
+        element={
+          <Protected>
+            <DemoFeature>
+              <Calls />
+            </DemoFeature>
+          </Protected>
+        }
+      />
+      <Route
+        path="/call-room"
+        element={
+          <Protected>
+            <DemoFeature>
+              <CallRoom />
+            </DemoFeature>
+          </Protected>
+        }
+      />
+      <Route
+        path="/documents"
+        element={
+          <Protected>
+            <DemoFeature>
+              <Documents />
+            </DemoFeature>
+          </Protected>
+        }
+      />
+      <Route
+        path="/labs"
+        element={
+          <Protected>
+            <DemoFeature>
+              <Labs />
+            </DemoFeature>
+          </Protected>
+        }
+      />
+      <Route
+        path="/notes"
+        element={
+          <Protected>
+            <DemoFeature>
+              <Notes />
+            </DemoFeature>
+          </Protected>
+        }
+      />
+      <Route
+        path="/medications"
+        element={
+          <Protected>
+            <DemoFeature>
+              <Medications />
+            </DemoFeature>
+          </Protected>
+        }
+      />
+      <Route
+        path="/timeline"
+        element={
+          <Protected>
+            <DemoFeature>
+              <Timeline />
+            </DemoFeature>
+          </Protected>
+        }
+      />
+      <Route
+        path="/health-profile"
+        element={
+          <Protected>
+            <DemoFeature>
+              <HealthProfile />
+            </DemoFeature>
+          </Protected>
+        }
+      />
+      <Route
+        path="/groups"
+        element={
+          <Protected>
+            <DemoFeature>
+              <Groups />
+            </DemoFeature>
+          </Protected>
+        }
+      />
+      <Route
+        path="/groups/:name"
+        element={
+          <Protected>
+            <DemoFeature>
+              <Group />
+            </DemoFeature>
+          </Protected>
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          <Protected>
+            <DemoFeature>
+              <Notifications />
+            </DemoFeature>
+          </Protected>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <Protected>
+            <DemoFeature>
+              <Settings />
+            </DemoFeature>
+          </Protected>
+        }
+      />
       {Object.keys(pageContent).map((k) => (
         <Route path={`/${k}`} element={<InfoPage kind={k} />} />
       ))}
@@ -2081,7 +2277,9 @@ function App() {
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <App />
+      <SessionProvider>
+        <App />
+      </SessionProvider>
     </BrowserRouter>
   </React.StrictMode>,
 );

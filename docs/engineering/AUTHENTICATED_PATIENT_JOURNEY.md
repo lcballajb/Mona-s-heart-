@@ -16,9 +16,10 @@ All implementation below belongs on a new branch from the reconciled main.
 
 The API already implements registration, verification, sign-in/out, password
 recovery/change, CSRF, session revocation and account export/deletion requests.
-The frontend Auth and Onboarding handlers in `src/main.tsx` currently navigate
-without authentication or durable saves. Profile persistence operations exist,
-but no profile HTTP endpoints. Matching, conversations and groups are principally
+The authenticated frontend now calls the real API for login, verification,
+password reset and private minimal-profile persistence. Explicit demo mode
+preserves the previous demonstration screens. Session bootstrap and profile HTTP
+endpoints are opt-in and refuse production enablement. Matching, conversations and groups are principally
 UI demonstrations; do not expose the existing helper/store examples as public
 APIs without enforcing authorization at the service and persistence boundaries.
 
@@ -61,18 +62,20 @@ email addresses. Only synthetic conditions and message content may be entered.
 | 5     | Support-group participation              | Schema/RLS for groups, memberships and posts; explicit join/leave/approval states and moderation capabilities; member-only access, revoked access, cross-group tests                                                           |
 | 6     | Integrated journey gate                  | Full browser journey against real local API + disposable PostgreSQL; refresh/back navigation, pending/error/empty states, mobile keyboard and accessibility checks; all required GitHub checks                                 |
 
-The exact next coding action is increment 1, starting with API session/profile
-DTOs and failing ownership/CSRF integration tests, then connecting the existing
-login form. Do not start video, AI, EHR, payments or additional feature areas.
+Increment 1 is implemented for opt-in local synthetic accounts; see the
+[completion evidence](AUTHENTICATED_ONBOARDING_COMPLETION.md). The exact next
+coding action is increment 2: versioned consent and persisted private
+patient/survivor onboarding preferences. Do not start video, AI, EHR, payments
+or additional feature areas.
 
 ### Increment 1 contract
 
-- `GET /v1/auth/me`: 200 `{ user: { id, roles }, csrfToken }` for an active,
+- `GET /v1/auth/me`: 200 `{ user: { id, roles }, csrfToken, expiresAt }` for an active,
   verified, non-deleted session; otherwise 401. Use a server-created synchronizer
   token; never return the raw session cookie, digest, email verification token or
   password fields. PostgreSQL currently stores only the CSRF digest: implement a
-  safe rotation/rehydration design rather than attempting to recover plaintext
-  from it. Concurrent tabs/requests must remain well-defined.
+  stable domain-separated HMAC rehydration design rather than attempting to recover
+  plaintext from it. Concurrent tabs/requests share the stable token.
 - `GET /v1/profile`: own minimal DTO `{ displayName, pronouns, locale }`, using a
   consistent empty profile when none exists. No owner ID from query parameters.
 - `PUT /v1/profile`: CSRF required; strict object schema, bounded strings, locale

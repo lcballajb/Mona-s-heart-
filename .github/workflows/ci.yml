@@ -50,6 +50,10 @@ jobs:
       - run: npm test
       - run: npm run test:postgres
       - run: npm run build
+      - name: Install browser for synthetic patient journey
+        run: npx playwright install --with-deps --only-shell chromium
+      - name: Verify real-browser synthetic onboarding
+        run: npm run test:browser
       - run: node scripts/backup.mjs --dry-run
       - run: node scripts/restore-check.mjs --dry-run
       - name: Verify generated commands leave the checkout clean

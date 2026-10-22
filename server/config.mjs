@@ -110,6 +110,11 @@ export function loadApiConfig(env = process.env) {
     errors.push(error.message);
   }
 
+  if (
+    env.SYNTHETIC_PATIENT_JOURNEY_ENABLED === "true" &&
+    environment === "production"
+  )
+    errors.push("Synthetic patient journey cannot be enabled in production");
   if (environment === "production") {
     if (env.DATABASE_ADAPTER !== "postgres")
       errors.push("DATABASE_ADAPTER must be postgres in production");
@@ -136,6 +141,7 @@ export function loadApiConfig(env = process.env) {
   return Object.freeze({
     environment,
     production: environment === "production",
+    syntheticPatientJourney: env.SYNTHETIC_PATIENT_JOURNEY_ENABLED === "true",
     host: env.API_HOST ?? "127.0.0.1",
     port,
     corsAllowlist,

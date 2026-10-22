@@ -289,3 +289,4 @@ This inventory is the navigation reference used by the orphan/link check. Inclus
 
 - [PR reconciliation report](engineering/PR_RECONCILIATION_REPORT.md)
 - [Authenticated patient journey implementation contract](engineering/AUTHENTICATED_PATIENT_JOURNEY.md)
+- [Authenticated login and onboarding completion evidence](engineering/AUTHENTICATED_ONBOARDING_COMPLETION.md)
