@@ -426,6 +426,48 @@ test(
         language: "en",
         organizationId: null,
       };
+
+      const privateEntry = await store.createHealthEntry(actor.id, {
+        kind: "wellness_preference",
+        labelCiphertext: Buffer.from("synthetic encrypted label"),
+        detailsCiphertext: Buffer.from("synthetic encrypted details"),
+      });
+      assert.equal(privateEntry.user_id, actor.id);
+      assert.equal((await store.listOwnHealthEntries(actor.id)).length, 1);
+      assert.deepEqual(await store.listOwnHealthEntries(otherActor.id), []);
+      await store.upsertProfile(actor.id, {
+        displayName: "Synthetic Person",
+      });
+
+      await store.transaction(
+        async (otherContext) => {
+          const hiddenHealth = await otherContext.query(
+            "SELECT id FROM health_entries WHERE id=$1",
+            [privateEntry.id],
+          );
+          assert.equal(hiddenHealth.rowCount, 0);
+          const hiddenProfile = await otherContext.query(
+            "SELECT user_id FROM profiles WHERE user_id=$1",
+            [actor.id],
+          );
+          assert.equal(hiddenProfile.rowCount, 0);
+          await assert.rejects(
+            otherContext.createHealthEntry(actor.id, {
+              kind: "wellness_preference",
+              labelCiphertext: Buffer.from("synthetic cross-user write"),
+            }),
+            (error) => error.code === "RLS_CONTEXT_MISMATCH",
+          );
+          await assert.rejects(
+            otherContext.upsertProfile(actor.id, {
+              displayName: "Cross-user overwrite",
+            }),
+            (error) => error.code === "RLS_CONTEXT_MISMATCH",
+          );
+        },
+        { userId: otherActor.id },
+      );
+
       await service.recordConsent(actor, "health_data_processing", "2026-01");
       await service.withdrawConsent(actor, "health_data_processing", "2026-01");
       const consents = await inActorContext(

@@ -90,3 +90,27 @@ test("imported metadata cannot reference another owner's deleted or inaccessible
   );
   assert.equal(store.importedRecords.length, 1);
 });
+
+test("PostgreSQL user-scoped operations fail closed on a mismatched transaction", async () => {
+  const contextStore = new PostgresStore(
+    { query: async () => ({ rows: [], rowCount: 0 }) },
+    () => new Date("2026-01-01T00:00:00.000Z"),
+    { rlsContext: { userId: "synthetic-user-a", organizationIds: [] } },
+  );
+
+  assert.deepEqual(
+    await contextStore.listOwnHealthEntries("synthetic-user-a"),
+    [],
+  );
+  await assert.rejects(
+    contextStore.listOwnHealthEntries("synthetic-user-b"),
+    (error) => error.code === "RLS_CONTEXT_MISMATCH",
+  );
+  await assert.rejects(
+    contextStore.createHealthEntry("synthetic-user-b", {
+      kind: "wellness_preference",
+      labelCiphertext: Buffer.from("synthetic encrypted value"),
+    }),
+    (error) => error.code === "RLS_CONTEXT_MISMATCH",
+  );
+});
