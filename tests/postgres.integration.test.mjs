@@ -450,6 +450,14 @@ test(
             [privateEntry.id],
           );
           assert.equal(hiddenHealth.rowCount, 0);
+          await assert.rejects(
+            otherContext.listOwnConsentHistory(actor.id),
+            (error) => error.code === "RLS_CONTEXT_MISMATCH",
+          );
+          await assert.rejects(
+            otherContext.recordConsent(actor.id, consentInput),
+            (error) => error.code === "RLS_CONTEXT_MISMATCH",
+          );
           const hiddenProfile = await otherContext.query(
             "SELECT user_id FROM profiles WHERE user_id=$1",
             [actor.id],
@@ -472,11 +480,18 @@ test(
         { userId: otherActor.id },
       );
 
+      const consentPrivileges = await store.query(
+        "SELECT has_table_privilege(current_user,'consent_records','UPDATE') AS can_update, has_table_privilege(current_user,'consent_records','DELETE') AS can_delete",
+      );
+      assert.deepEqual(consentPrivileges.rows[0], {
+        can_update: false,
+        can_delete: false,
+      });
       await service.recordConsent(actor, "health_data_processing", "2026-01");
       await service.withdrawConsent(actor, "health_data_processing", "2026-01");
       const consents = await inActorContext(
         actor.id,
-        "SELECT granted FROM consent_records WHERE user_id=$1 ORDER BY granted_at",
+        "SELECT granted FROM consent_records WHERE user_id=$1 AND purpose='health_data_processing' ORDER BY event_order",
         [actor.id],
       );
       assert.deepEqual(

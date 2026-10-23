@@ -138,7 +138,11 @@ const server = http.createServer(async (request, response) => {
         },
       );
     }
-    const journeyRoute = path === "/v1/auth/me" || path === "/v1/profile";
+    const journeyRoute = [
+      "/v1/auth/me",
+      "/v1/profile",
+      "/v1/consent-history",
+    ].includes(path);
     if (journeyRoute && !config.syntheticPatientJourney)
       return reply(response, 503, {
         error: "Synthetic patient journey is disabled",
@@ -170,6 +174,10 @@ const server = http.createServer(async (request, response) => {
       !(await store.validateCsrf(session, request.headers["x-csrf-token"]))
     )
       return reply(response, 403, { error: "CSRF validation failed" });
+    if (request.method === "GET" && path === "/v1/consent-history")
+      return reply(response, 200, {
+        events: await service.consentHistory(actor),
+      });
     if (request.method === "GET" && path === "/v1/profile")
       return reply(response, 200, { profile: await service.ownProfile(actor) });
     if (request.method === "PUT" && path === "/v1/profile")

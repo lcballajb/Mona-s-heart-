@@ -214,6 +214,12 @@ try {
     await tab.getByLabel(detailLabel).inputValue(),
     "Fictional onboarding detail Alpha",
   );
+  await tab.getByRole("heading", { name: "Your consent history" }).waitFor();
+  await tab.getByText("Private onboarding: Granted", { exact: true }).waitFor();
+  if (role === "survivor")
+    await tab
+      .getByText("Matching preference: Granted", { exact: true })
+      .waitFor();
   await tab.close();
   const me = await page.evaluate(async () => {
     const r = await fetch("/v1/auth/me");
@@ -256,6 +262,19 @@ try {
           .matchingConsent,
     );
     assert.equal(withdrawn, false);
+    await page.getByRole("link", { name: "Edit profile" }).click();
+    await page
+      .getByText("Matching preference: Not granted / withdrawn", {
+        exact: true,
+      })
+      .waitFor();
+    await page
+      .getByText("Matching preference: Granted", { exact: true })
+      .waitFor();
+    await page.goto(`${base}/dashboard`);
+    await page
+      .getByRole("heading", { name: /Welcome, Synthetic Alice Updated/ })
+      .waitFor();
   }
   step = "no browser persistence";
   const stored = await page.evaluate(() => ({

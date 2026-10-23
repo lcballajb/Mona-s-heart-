@@ -51,6 +51,7 @@ export async function httpAuthJourney({ admin, user, otherUser, password }) {
     assert.equal(ready, true, "Test API must become ready");
     assert.equal((await request("/v1/auth/sessions")).status, 401);
     assert.equal((await request("/v1/profile")).status, 401);
+    assert.equal((await request("/v1/consent-history")).status, 401);
     assert.equal((await request("/v1/auth/me")).status, 401);
     assert.equal(
       (
@@ -181,6 +182,47 @@ export async function httpAuthJourney({ admin, user, otherUser, password }) {
       maximumUnicode.medications,
     );
     assert.equal((await put({ ...update, onboarding })).status, 200);
+    const history = await (
+      await request("/v1/consent-history", { headers })
+    ).json();
+    assert.ok(history.events.length >= 1);
+    assert.equal(history.events[0].purpose, "synthetic_onboarding");
+    assert.equal(history.events[0].version, "synthetic-onboarding-v1");
+    assert.equal(history.events[0].granted, true);
+    assert.deepEqual(Object.keys(history.events[0]).sort(), [
+      "granted",
+      "id",
+      "purpose",
+      "recordedAt",
+      "version",
+    ]);
+    // A consent insertion failure must roll back the profile change too.
+    await admin.query(
+      `CREATE FUNCTION fail_consent_test() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic consent failure'; END $$`,
+    );
+    await admin.query(
+      "CREATE TRIGGER fail_consent_test BEFORE INSERT ON consent_records FOR EACH ROW EXECUTE FUNCTION fail_consent_test()",
+    );
+    try {
+      assert.equal(
+        (await put({ ...update, displayName: "Must roll back", onboarding }))
+          .status,
+        500,
+      );
+      assert.equal(
+        (await (await request("/v1/profile", { headers })).json()).profile
+          .displayName,
+        update.displayName,
+      );
+      assert.deepEqual(
+        (await (await request("/v1/consent-history", { headers })).json())
+          .events,
+        history.events,
+      );
+    } finally {
+      await admin.query("DROP TRIGGER fail_consent_test ON consent_records");
+      await admin.query("DROP FUNCTION fail_consent_test()");
+    }
     const persistedProfile = (
       await (await request("/v1/profile", { headers })).json()
     ).profile;
@@ -217,6 +259,14 @@ export async function httpAuthJourney({ admin, user, otherUser, password }) {
     const otherHeaders = {
       cookie: otherLogin.headers.get("set-cookie").split(";")[0],
     };
+    assert.deepEqual(
+      await (
+        await request(`/v1/consent-history?userId=${user.id}`, {
+          headers: otherHeaders,
+        })
+      ).json(),
+      { events: [] },
+    );
     assert.deepEqual(
       await (
         await request(`/v1/profile?userId=${user.id}`, {

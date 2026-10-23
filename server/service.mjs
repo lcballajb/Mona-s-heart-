@@ -249,7 +249,7 @@ export class MonaService {
     } catch {
       throw Object.assign(new Error("Invalid locale"), { statusCode: 400 });
     }
-    await this.store.upsertProfile(actor.id, {
+    await this.store.saveProfileWithConsent(actor.id, {
       displayName,
       ...(value.onboarding === undefined
         ? {}
@@ -258,6 +258,9 @@ export class MonaService {
       locale,
     });
     return this.ownProfile(actor);
+  }
+  async consentHistory(actor) {
+    return this.store.listOwnConsentHistory(actor.id);
   }
   async approveRole(actor, userId, role, reason) {
     requireAnyRole(actor, ["administrator"]);

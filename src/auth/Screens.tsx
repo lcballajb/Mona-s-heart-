@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSession } from "./Session";
+import type { ConsentEventDTO } from "./client";
 
 const message = (error: unknown) =>
   error instanceof Error ? error.message : "Unable to complete this request.";
@@ -449,6 +450,77 @@ export function PatientProfileForm() {
           {busy ? "Saving…" : "Save profile"}
         </button>
       </form>
+      <ConsentHistory />
+    </section>
+  );
+}
+
+function ConsentHistory() {
+  const { api, state } = useSession();
+  const [events, setEvents] = useState<ConsentEventDTO[] | null>(null);
+  const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setEvents(null);
+    setError("");
+    api
+      .consentHistory()
+      .then((result) => {
+        if (active) setEvents(result.events);
+      })
+      .catch((e) => {
+        if (active) setError(message(e));
+      });
+    return () => {
+      active = false;
+    };
+  }, [api, state.user?.id, attempt]);
+  return (
+    <section aria-labelledby="consent-history-title">
+      <h2 id="consent-history-title">Your consent history</h2>
+      <p>
+        Your latest 100 recorded choices, newest first. Earlier profile choices
+        were not backfilled. Matching remains unavailable; these records do not
+        share your profile.
+      </p>
+      {error ? (
+        <div role="alert">
+          <p>{error}</p>
+          <button
+            type="button"
+            onClick={() => setAttempt((value) => value + 1)}
+          >
+            Retry consent history
+          </button>
+        </div>
+      ) : events === null ? (
+        <p role="status">Loading consent history…</p>
+      ) : events.length === 0 ? (
+        <p>
+          No consent events recorded yet. Your next onboarding save will record
+          your choices.
+        </p>
+      ) : (
+        <ol>
+          {events.map((event) => (
+            <li key={event.id}>
+              <strong>
+                {event.purpose === "synthetic_matching"
+                  ? "Matching preference"
+                  : "Private onboarding"}
+                : {event.granted ? "Granted" : "Not granted / withdrawn"}
+              </strong>
+              <p>
+                <time dateTime={event.recordedAt}>
+                  {new Date(event.recordedAt).toLocaleString()}
+                </time>{" "}
+                · Notice {event.version}
+              </p>
+            </li>
+          ))}
+        </ol>
+      )}
     </section>
   );
 }
