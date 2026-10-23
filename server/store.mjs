@@ -1,3 +1,4 @@
+import { onboardingConsentEvents } from "./onboarding.mjs";
 import { randomUUID } from "node:crypto";
 import { tokenDigest, sessionCsrfToken } from "./security.mjs";
 
@@ -270,7 +271,7 @@ export class MemoryStore {
     );
   }
   recordConsent(userId, input) {
-    const row = { ...input, userId, grantedAt: this.now() };
+    const row = { ...input, id: randomUUID(), userId, grantedAt: this.now() };
     this.consents.push(row);
     return row;
   }
@@ -457,6 +458,34 @@ export class MemoryStore {
     };
     this.reports.push(row);
     return row;
+  }
+  saveProfileWithConsent(userId, profile) {
+    const events = onboardingConsentEvents(profile).map((event) => ({
+      ...event,
+      id: randomUUID(),
+      userId,
+      grantedAt: this.now(),
+      withdrawnAt: event.granted ? null : this.now(),
+    }));
+    this.upsertProfile(userId, profile);
+    this.consents.push(...events);
+  }
+  listOwnConsentHistory(userId) {
+    return this.consents
+      .filter(
+        (row) =>
+          row.userId === userId &&
+          ["synthetic_onboarding", "synthetic_matching"].includes(row.purpose),
+      )
+      .slice(-100)
+      .reverse()
+      .map((row) => ({
+        id: row.id,
+        purpose: row.purpose,
+        version: row.version,
+        granted: row.granted,
+        recordedAt: row.grantedAt,
+      }));
   }
   upsertProfile(userId, profile) {
     const row = {

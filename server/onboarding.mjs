@@ -56,3 +56,28 @@ export function validateOnboarding(actor, input) {
   }
   return result;
 }
+
+export function onboardingConsentEvents(profile) {
+  if (!profile.onboarding) return [];
+  const o = profile.onboarding;
+  const events = [
+    {
+      purpose: "synthetic_onboarding",
+      version: o.consentVersion,
+      granted: true,
+    },
+  ];
+  if (o.accountType === "survivor")
+    events.push({
+      purpose: "synthetic_matching",
+      version: "synthetic-matching-preference-v1",
+      granted: o.matchingConsent === true,
+    });
+  return events.map((event) => ({
+    ...event,
+    sourceInterface: "synthetic_onboarding",
+    region: "unspecified",
+    language: profile.locale ?? "en",
+    organizationId: null,
+  }));
+}

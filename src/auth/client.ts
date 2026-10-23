@@ -1,3 +1,10 @@
+export type ConsentEventDTO = {
+  id: string;
+  purpose: "synthetic_onboarding" | "synthetic_matching";
+  version: string;
+  granted: boolean;
+  recordedAt: string;
+};
 export type OnboardingDTO = {
   accountType?: string;
   completedAt?: string;
@@ -137,6 +144,9 @@ export class PatientClient {
       { token, password },
       true,
     );
+  }
+  consentHistory() {
+    return this.request<{ events: ConsentEventDTO[] }>("/consent-history");
   }
   profile() {
     return this.request<{ profile: ProfileDTO }>("/profile");

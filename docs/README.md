@@ -292,3 +292,5 @@ This inventory is the navigation reference used by the orphan/link check. Inclus
 - [Authenticated login and onboarding completion evidence](engineering/AUTHENTICATED_ONBOARDING_COMPLETION.md)
 
 - [Phase 3A authenticated onboarding](engineering/PHASE_3A_ONBOARDING.md)
+
+- [Phase 3B private consent history](engineering/PHASE_3B_CONSENT_HISTORY.md)

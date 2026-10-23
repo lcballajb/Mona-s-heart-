@@ -31,6 +31,8 @@ export const STORE_OPERATIONS = Object.freeze([
   "findUserById",
   "getOwnDocument",
   "getOwnProfile",
+  "saveProfileWithConsent",
+  "listOwnConsentHistory",
   "restoreSessionCsrf",
   "hasMembership",
   "listOwnHealthEntries",

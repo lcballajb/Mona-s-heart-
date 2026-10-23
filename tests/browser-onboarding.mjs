@@ -214,6 +214,12 @@ try {
     await tab.getByLabel(detailLabel).inputValue(),
     "Fictional onboarding detail Alpha",
   );
+  await tab.getByRole("heading", { name: "Your consent history" }).waitFor();
+  await tab.getByText("Private onboarding: Granted", { exact: true }).waitFor();
+  if (role === "survivor")
+    await tab
+      .getByText("Matching preference: Granted", { exact: true })
+      .waitFor();
   await tab.close();
   const me = await page.evaluate(async () => {
     const r = await fetch("/v1/auth/me");
@@ -256,6 +262,19 @@ try {
           .matchingConsent,
     );
     assert.equal(withdrawn, false);
+    await page.getByRole("link", { name: "Edit profile" }).click();
+    await page
+      .getByText("Matching preference: Not granted / withdrawn", {
+        exact: true,
+      })
+      .waitFor();
+    await page
+      .getByText("Matching preference: Granted", { exact: true })
+      .waitFor();
+    await page.goto(`${base}/dashboard`);
+    await page
+      .getByRole("heading", { name: /Welcome, Synthetic Alice Updated/ })
+      .waitFor();
   }
   step = "no browser persistence";
   const stored = await page.evaluate(() => ({
@@ -355,11 +374,17 @@ try {
   step = "session expiry clears data";
   admin = new pg.Client({ connectionString: process.env.DB_ADMIN_URL });
   await admin.connect();
+  await page.getByRole("link", { name: "Edit profile" }).click();
+  await page
+    .getByText("Private onboarding: Granted", { exact: true })
+    .first()
+    .waitFor();
+  // Expire after the form/history read completes so this specifically tests a
+  // write receiving 401; the history GET also correctly detects expired sessions.
   await admin.query(
     "UPDATE sessions SET expires_at=now()-interval '1 second' WHERE user_id=$1",
     [me.user.id],
   );
-  await page.getByRole("link", { name: "Edit profile" }).click();
   await page.getByLabel("Display name", { exact: true }).fill("Must not save");
   await page.getByLabel("I agree to save these synthetic details").check();
   await page.getByRole("button", { name: "Save profile" }).click();

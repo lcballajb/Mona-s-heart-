@@ -1,3 +1,4 @@
+import { onboardingConsentEvents } from "./onboarding.mjs";
 import { randomUUID } from "node:crypto";
 import { tokenDigest, sessionCsrfToken } from "./security.mjs";
 import { databaseMetrics, timedQuery } from "./database.mjs";
@@ -357,26 +358,23 @@ export class PostgresStore {
     return rows[0];
   }
   async recordConsent(userId, input) {
-    return this.transaction(
-      async (tx) => {
-        const { rows } = await tx.query(
-          `INSERT INTO consent_records(user_id,purpose,policy_version,granted,granted_at,withdrawn_at,capture_method,region,language,organization_id) VALUES($1,$2,$3,$4,now(),$5,$6,$7,$8,$9) RETURNING *`,
-          [
-            userId,
-            input.purpose,
-            input.version,
-            input.granted,
-            input.withdrawnAt,
-            input.sourceInterface,
-            input.region,
-            input.language,
-            input.organizationId,
-          ],
-        );
-        return rows[0];
-      },
-      { userId },
-    );
+    return this.asUser(userId, async (tx) => {
+      const { rows } = await tx.query(
+        `INSERT INTO consent_records(user_id,purpose,policy_version,granted,granted_at,withdrawn_at,capture_method,region,language,organization_id) VALUES($1,$2,$3,$4,now(),$5,$6,$7,$8,$9) RETURNING *`,
+        [
+          userId,
+          input.purpose,
+          input.version,
+          input.granted,
+          input.withdrawnAt,
+          input.sourceInterface,
+          input.region,
+          input.language,
+          input.organizationId,
+        ],
+      );
+      return rows[0];
+    });
   }
   async createJob(kind, payloadReference, scheduledAt = this.now()) {
     const { rows } = await this.query(
@@ -519,6 +517,36 @@ export class PostgresStore {
       [reporterId, subjectId, reason],
     );
     return rows[0];
+  }
+  async saveProfileWithConsent(userId, profile) {
+    return this.asUser(userId, async (tx) => {
+      // Serialize this account's profile/consent changes, including first save.
+      await tx.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [userId]);
+      await tx.upsertProfile(userId, profile);
+      for (const event of onboardingConsentEvents(profile))
+        await tx.recordConsent(userId, {
+          ...event,
+          withdrawnAt: event.granted ? null : tx.now(),
+        });
+    });
+  }
+  async listOwnConsentHistory(userId) {
+    return this.asUser(userId, async (tx) => {
+      const { rows } = await tx.query(
+        `SELECT id,purpose,policy_version,granted,granted_at
+        FROM consent_records WHERE user_id=$1
+        AND purpose IN ('synthetic_onboarding','synthetic_matching')
+        ORDER BY event_order DESC LIMIT 100`,
+        [userId],
+      );
+      return rows.map((row) => ({
+        id: row.id,
+        purpose: row.purpose,
+        version: row.policy_version,
+        granted: row.granted,
+        recordedAt: iso(row.granted_at),
+      }));
+    });
   }
   async upsertProfile(userId, profile) {
     return this.asUser(userId, async (tx) => {
