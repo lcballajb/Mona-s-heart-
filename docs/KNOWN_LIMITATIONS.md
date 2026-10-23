@@ -5,9 +5,15 @@ forced row-level security, runtime-role checks, authentication/session controls,
 terminology proxy and automated tests exist. These foundations do not establish a
 fully integrated or operated patient platform.
 
-The React authentication/onboarding, profile, medication, messaging, call, group,
-document and notification screens are principally demonstrations. Most are not
-connected to authenticated backend workflows. Video and other high-risk features
+Authentication and basic private profiles were integrated in PR #147. Phase 3A
+adds optional role-specific synthetic onboarding, private consent/preferences and
+a persisted dashboard. Owner-only profile persistence uses the reconciled actor
+context from PR #144; deletion lifecycle work is in PR #145. The historical Phase 2
+assessment predates these changes. See the Phase 3A PR for current test evidence.
+
+Medication details in onboarding are free text, not a medication-management or
+clinical workflow. Matching, messaging, calls, groups, documents and notifications
+remain demonstrations or incomplete authenticated workflows. Video and other high-risk features
 default off. Document storage/scanning uses development abstractions; production
 email, object storage, malware scanning and shared rate limiting need approved
 adapters. Default worker handlers are unconfigured. Health encryption/KMS,

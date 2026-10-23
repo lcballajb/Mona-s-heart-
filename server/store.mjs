@@ -461,6 +461,7 @@ export class MemoryStore {
   upsertProfile(userId, profile) {
     const row = {
       userId,
+      onboarding: profile.onboarding ?? this.profiles.get(userId)?.onboarding,
       displayName: profile.displayName,
       pronouns: profile.pronouns ?? null,
       locale: profile.locale ?? "en",

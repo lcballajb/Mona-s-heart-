@@ -296,12 +296,13 @@ export class PostgresStore {
   async getOwnProfile(userId) {
     return this.asUser(userId, async (tx) => {
       const { rows } = await tx.query(
-        "SELECT display_name,pronouns,locale FROM profiles WHERE user_id=$1",
+        "SELECT display_name,pronouns,locale,onboarding FROM profiles WHERE user_id=$1",
         [userId],
       );
       const row = rows[0];
       return row
         ? {
+            onboarding: row.onboarding,
             displayName: row.display_name,
             pronouns: row.pronouns,
             locale: row.locale,
@@ -522,12 +523,13 @@ export class PostgresStore {
   async upsertProfile(userId, profile) {
     return this.asUser(userId, async (tx) => {
       const { rows } = await tx.query(
-        `INSERT INTO profiles(user_id,display_name,pronouns,locale) VALUES($1,$2,$3,$4) ON CONFLICT(user_id) DO UPDATE SET display_name=EXCLUDED.display_name,pronouns=EXCLUDED.pronouns,locale=EXCLUDED.locale,updated_at=now() RETURNING *`,
+        `INSERT INTO profiles(user_id,display_name,pronouns,locale,onboarding) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id) DO UPDATE SET display_name=EXCLUDED.display_name,pronouns=EXCLUDED.pronouns,locale=EXCLUDED.locale,onboarding=COALESCE(EXCLUDED.onboarding,profiles.onboarding),updated_at=now() RETURNING *`,
         [
           userId,
           profile.displayName,
           profile.pronouns ?? null,
           profile.locale ?? "en",
+          profile.onboarding ?? null,
         ],
       );
       return rows[0];

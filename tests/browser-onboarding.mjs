@@ -63,6 +63,13 @@ async function ready(url) {
   }
   throw new Error("Readiness failed");
 }
+const role = process.env.ONBOARDING_TEST_ROLE ?? "patient";
+const detailLabel =
+  role === "patient"
+    ? "Diagnosis (optional)"
+    : role === "survivor"
+      ? "Lived experience (optional)"
+      : "Caregiver information (optional)";
 const email = `browser-${Date.now()}@example.test`;
 const password = "synthetic correct horse battery staple";
 async function delivered(kind) {
@@ -116,6 +123,7 @@ try {
   await page.goto(`${base}/signup`);
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.locator("select[name=role]").selectOption(role);
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Create synthetic account" }).click();
   await page
@@ -150,6 +158,35 @@ try {
     .getByLabel("Display name", { exact: true })
     .fill("Synthetic Alice");
   await page.getByLabel("Pronouns (optional)").fill("they/them");
+  await page.getByLabel(detailLabel).fill("Fictional onboarding detail Alpha");
+  await page
+    .getByLabel("Support preferences (optional)")
+    .fill("Synthetic peer support");
+  if (role === "patient") {
+    await page.getByLabel("Symptoms (optional)").fill("Fictional symptom Beta");
+    await page
+      .getByLabel("Medications (optional)")
+      .fill("Fictional medication Gamma");
+  }
+  if (role === "survivor") {
+    await page.getByLabel("I am willing to mentor").check();
+    await page.getByLabel("I consent to future synthetic matching").check();
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(
+    await page.evaluate(
+      () =>
+        globalThis.document.documentElement.scrollWidth <=
+        globalThis.innerWidth,
+    ),
+    true,
+  );
+  await page.screenshot({
+    path: `/tmp/mona-onboarding-${role}-mobile.png`,
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.getByLabel("I agree to save these synthetic details").check();
   await page.getByRole("button", { name: "Save profile" }).click();
   await page.waitForURL("**/dashboard");
   await page
@@ -160,12 +197,22 @@ try {
   await page
     .getByRole("heading", { name: /Welcome, Synthetic Alice/ })
     .waitFor();
+  await page
+    .getByText("Onboarding complete. Your details are saved privately.")
+    .waitFor();
+  await page
+    .getByText("Fictional onboarding detail Alpha", { exact: true })
+    .waitFor();
   const tab = await context.newPage();
   await tab.goto(`${base}/onboarding`);
   await tab.getByLabel("Display name", { exact: true }).waitFor();
   assert.equal(
     await tab.getByLabel("Display name", { exact: true }).inputValue(),
     "Synthetic Alice",
+  );
+  assert.equal(
+    await tab.getByLabel(detailLabel).inputValue(),
+    "Fictional onboarding detail Alpha",
   );
   await tab.close();
   const me = await page.evaluate(async () => {
@@ -182,13 +229,34 @@ try {
     return r.status;
   });
   assert.equal(csrfDenied, 403);
+  const own = await page.evaluate(
+    async () => (await (await fetch("/v1/profile")).json()).profile,
+  );
+  assert.equal(own.onboarding.accountType, role);
+  assert.equal(own.onboarding.privacy, "private");
+  assert.equal(own.onboarding.supportPreferences, "Synthetic peer support");
+  if (role === "survivor") assert.equal(own.onboarding.matchingConsent, true);
   step = "edit after other tab";
   await page.getByRole("link", { name: "Edit profile" }).click();
   await page
     .getByLabel("Display name", { exact: true })
     .fill("Synthetic Alice Updated");
+  if (role === "survivor")
+    await page.getByLabel("I consent to future synthetic matching").uncheck();
+  await page.getByLabel("I agree to save these synthetic details").check();
   await page.getByRole("button", { name: "Save profile" }).click();
   await page.waitForURL("**/dashboard");
+  await page
+    .getByText("Fictional onboarding detail Alpha", { exact: true })
+    .waitFor();
+  if (role === "survivor") {
+    const withdrawn = await page.evaluate(
+      async () =>
+        (await (await fetch("/v1/profile")).json()).profile.onboarding
+          .matchingConsent,
+    );
+    assert.equal(withdrawn, false);
+  }
   step = "no browser persistence";
   const stored = await page.evaluate(() => ({
     local: Object.keys(globalThis.localStorage),
@@ -293,6 +361,7 @@ try {
   );
   await page.getByRole("link", { name: "Edit profile" }).click();
   await page.getByLabel("Display name", { exact: true }).fill("Must not save");
+  await page.getByLabel("I agree to save these synthetic details").check();
   await page.getByRole("button", { name: "Save profile" }).click();
   await page.waitForURL("**/login");
   assert.doesNotMatch(
@@ -322,7 +391,7 @@ try {
   await page.getByRole("heading", { name: /Good morning, Elena/ }).waitFor();
   assert.deepEqual(errors, []);
   console.log(
-    "Browser onboarding PASS: register, verify, login, save, reload, two tabs, edit, CSRF, logout, reset, expiry, API failure, mobile and explicit demo",
+    `Browser onboarding PASS (${role}): register, verify, login, save, reload, two tabs, edit, CSRF, logout, reset, expiry, API failure, mobile and explicit demo`,
   );
 } catch (error) {
   // Never print token-bearing navigation URLs or private delivery contents.

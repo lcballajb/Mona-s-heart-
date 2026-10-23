@@ -131,6 +131,80 @@ export async function httpAuthJourney({ admin, user, otherUser, password }) {
     assert.deepEqual(await (await request("/v1/profile", { headers })).json(), {
       profile: update,
     });
+    const onboarding = {
+      diagnosis: "Fictional HTTP condition",
+      symptoms: "Fictional symptom",
+      medications: "Fictional medication",
+      supportPreferences: "Peer support",
+      privacy: "private",
+      consent: true,
+      consentVersion: "synthetic-onboarding-v1",
+    };
+    assert.equal(
+      (
+        await put({
+          ...update,
+          onboarding: { ...onboarding, accountType: "survivor" },
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (await put({ ...update, onboarding: { ...onboarding, consent: false } }))
+        .status,
+      400,
+    );
+    assert.equal((await put({ ...update, onboarding })).status, 200);
+    assert.equal(
+      (
+        await put({
+          ...update,
+          onboarding: { ...onboarding, symptoms: "\u0000" },
+        })
+      ).status,
+      400,
+    );
+    const maximumUnicode = {
+      ...onboarding,
+      diagnosis: "界".repeat(1000),
+      symptoms: "界".repeat(1000),
+      medications: "界".repeat(1000),
+      supportPreferences: "界".repeat(1000),
+    };
+    assert.equal(
+      (await put({ ...update, onboarding: maximumUnicode })).status,
+      200,
+    );
+    assert.equal(
+      (await (await request("/v1/profile", { headers })).json()).profile
+        .onboarding.medications,
+      maximumUnicode.medications,
+    );
+    assert.equal((await put({ ...update, onboarding })).status, 200);
+    const persistedProfile = (
+      await (await request("/v1/profile", { headers })).json()
+    ).profile;
+    assert.equal(persistedProfile.onboarding.diagnosis, onboarding.diagnosis);
+    assert.equal(persistedProfile.onboarding.accountType, "patient");
+    assert.ok(persistedProfile.onboarding.completedAt);
+    const databaseProfile = await admin.query(
+      "SELECT onboarding FROM profiles WHERE user_id=$1",
+      [user.id],
+    );
+    assert.deepEqual(
+      databaseProfile.rows[0].onboarding,
+      persistedProfile.onboarding,
+    );
+    assert.equal(
+      (await put({ ...update, onboarding: { ...onboarding, diagnosis: "" } }))
+        .status,
+      200,
+    );
+    assert.equal(
+      (await (await request("/v1/profile", { headers })).json()).profile
+        .onboarding.diagnosis,
+      "",
+    );
     assert.equal(
       (await request(`/v1/profile?userId=${otherUser.id}`, { headers })).status,
       200,

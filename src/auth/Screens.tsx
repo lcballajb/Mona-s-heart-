@@ -275,8 +275,28 @@ export function TokenForm({ reset = false }: { reset?: boolean }) {
   );
 }
 
+const onboardingFields: Record<string, [string, string][]> = {
+  patient: [
+    ["diagnosis", "Diagnosis (optional)"],
+    ["symptoms", "Symptoms (optional)"],
+    ["medications", "Medications (optional)"],
+  ],
+  survivor: [
+    ["livedExperience", "Lived experience (optional)"],
+    ["availability", "Availability (optional)"],
+  ],
+  caregiver: [["caregiverInformation", "Caregiver information (optional)"]],
+};
 export function PatientProfileForm() {
   const { state, save } = useSession();
+  const accountType =
+    ["patient", "survivor", "caregiver"].find((role) =>
+      state.user?.roles.includes(role),
+    ) ?? "patient";
+  const fields = [
+    ...onboardingFields[accountType],
+    ["supportPreferences", "Support preferences (optional)"],
+  ];
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -290,6 +310,21 @@ export function PatientProfileForm() {
         displayName: String(data.get("displayName")),
         pronouns: String(data.get("pronouns")),
         locale: String(data.get("locale")),
+        onboarding: {
+          ...Object.fromEntries(
+            fields.map(([key]) => [key, String(data.get(key) ?? "")]),
+          ),
+          supportPreferences: String(data.get("supportPreferences") ?? ""),
+          ...(accountType === "survivor"
+            ? {
+                willingToMentor: data.get("willingToMentor") === "on",
+                matchingConsent: data.get("matchingConsent") === "on",
+              }
+            : {}),
+          privacy: "private",
+          consentVersion: "synthetic-onboarding-v1",
+          consent: data.get("consent") === "on",
+        },
       });
       navigate("/dashboard");
     } catch (e) {
@@ -304,8 +339,8 @@ export function PatientProfileForm() {
       <h1>Let’s get to know you</h1>
       <p>
         Use a fictional display name. This profile is private to your account.
-        Health details and discovery preferences will be connected in the next
-        increment.
+        Enter synthetic information only. Optional details can be left blank or
+        removed later. Nothing here is published or shared with another account.
       </p>
       <form className="onboard" onSubmit={submit}>
         <label>
@@ -341,6 +376,74 @@ export function PatientProfileForm() {
             <option value="fr">Français</option>
           </select>
         </label>
+        <fieldset>
+          <legend>
+            {accountType[0].toUpperCase() + accountType.slice(1)} onboarding
+          </legend>
+          {fields.map(([key, label]) => (
+            <label key={key}>
+              {label}
+              <textarea
+                name={key}
+                maxLength={1000}
+                rows={3}
+                autoComplete="off"
+                defaultValue={String(
+                  state.profile?.onboarding?.[
+                    key as keyof typeof state.profile.onboarding
+                  ] ?? "",
+                )}
+              />
+            </label>
+          ))}
+          {accountType === "survivor" && (
+            <>
+              <label>
+                <input
+                  type="checkbox"
+                  name="willingToMentor"
+                  defaultChecked={
+                    state.profile?.onboarding?.willingToMentor ?? false
+                  }
+                />{" "}
+                I am willing to mentor (preference only)
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  name="matchingConsent"
+                  defaultChecked={
+                    state.profile?.onboarding?.matchingConsent ?? false
+                  }
+                />{" "}
+                I consent to future synthetic matching using my survivor
+                preferences
+              </label>
+              <p>
+                Matching is not enabled. This choice does not publish your
+                profile or grant a mentor role. Uncheck and save to withdraw.
+              </p>
+            </>
+          )}
+          {accountType === "caregiver" && (
+            <p>
+              Your caregiver account does not grant access to anyone else’s
+              medical information. Do not enter another person’s identifying
+              details.
+            </p>
+          )}
+          <label>
+            Privacy
+            <select name="privacy" defaultValue="private">
+              <option value="private">Private — only my account</option>
+            </select>
+          </label>
+          <label>
+            <input type="checkbox" name="consent" required /> I agree to save
+            these synthetic details privately for this prototype (notice version
+            synthetic-onboarding-v1).
+          </label>
+        </fieldset>
         {error && <p role="alert">{error}</p>}
         <button className="button" disabled={busy}>
           {busy ? "Saving…" : "Save profile"}
