@@ -86,6 +86,19 @@ export async function httpPeerJourney({ request, admin, store }) {
     JSON.stringify(await state(p)),
     /Private synthetic name|PRIVATE NONSHARED|example.test/,
   );
+  await admin.query("UPDATE users SET status='deactivated' WHERE id=$1", [
+    s.id,
+  ]);
+  assert.equal(
+    (await state(p)).cards.some((c) => c.userId === s.id),
+    false,
+  );
+  assert.equal((await post("/v1/peers/requests", req, p.headers)).status, 404);
+  assert.equal(
+    (await request("/v1/peers", { headers: s.headers })).status,
+    401,
+  );
+  await admin.query("UPDATE users SET status='active' WHERE id=$1", [s.id]);
   const duplicate = await Promise.all([
     post("/v1/peers/requests", req, p.headers),
     post("/v1/peers/requests", req, p.headers),

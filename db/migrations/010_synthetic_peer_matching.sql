@@ -75,6 +75,7 @@ BEGIN
   THEN RAISE EXCEPTION 'Invalid peer transition' USING ERRCODE='42501'; END IF;
   IF NEW.status='accepted' AND (
     NOT synthetic_peer_eligible(NEW.requester_id)
+    OR NOT synthetic_peer_eligible(NEW.survivor_id,'survivor')
     OR NOT EXISTS(SELECT 1 FROM survivor_cards c WHERE c.user_id=NEW.survivor_id AND c.published)
     OR EXISTS(SELECT 1 FROM blocks WHERE (blocker_id=NEW.requester_id AND blocked_id=NEW.survivor_id)
       OR (blocked_id=NEW.requester_id AND blocker_id=NEW.survivor_id)))
