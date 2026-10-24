@@ -46,6 +46,11 @@ test("new session/profile HTTP routes stay disabled without explicit synthetic o
       ["/v1/auth/me", "GET"],
       ["/v1/profile", "GET"],
       ["/v1/consent-history", "GET"],
+      ["/v1/peers", "GET"],
+      ["/v1/peers/card", "POST"],
+      ["/v1/peers/requests", "POST"],
+      ["/v1/peers/respond", "POST"],
+      ["/v1/peers/block", "POST"],
       ["/v1/profile", "PUT"],
     ])
       assert.equal((await request(path, method)).status, 503);

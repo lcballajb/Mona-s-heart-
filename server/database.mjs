@@ -3,6 +3,9 @@ import pg from "pg";
 const { Pool } = pg;
 
 export const PROTECTED_RLS_TABLES = Object.freeze([
+  "blocks",
+  "survivor_cards",
+  "peer_match_requests",
   "consent_records",
   "conversation_members",
   "conversations",

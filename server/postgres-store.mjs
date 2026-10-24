@@ -1,3 +1,4 @@
+import { postgresPeers } from "./postgres-peers.mjs";
 import { onboardingConsentEvents } from "./onboarding.mjs";
 import { randomUUID } from "node:crypto";
 import { tokenDigest, sessionCsrfToken } from "./security.mjs";
@@ -31,6 +32,9 @@ export class PostgresStore {
     this.clock = clock;
     this.sessionPepper = sessionPepper;
     this.rlsContext = rlsContext;
+  }
+  peerOperation(id, op, input) {
+    return postgresPeers(this, id, op, input);
   }
   now() {
     return this.clock().toISOString();
@@ -505,11 +509,13 @@ export class PostgresStore {
     );
   }
   async createBlock(blockerId, blockedId) {
-    const { rows } = await this.query(
-      "INSERT INTO blocks(blocker_id,blocked_id) VALUES($1,$2) RETURNING *",
-      [blockerId, blockedId],
-    );
-    return rows[0];
+    return this.asUser(blockerId, async (tx) => {
+      await tx.query(
+        "INSERT INTO blocks(blocker_id,blocked_id) VALUES($1,$2) ON CONFLICT DO NOTHING",
+        [blockerId, blockedId],
+      );
+      return { blockerId, blockedId };
+    });
   }
   async createReport(reporterId, subjectId, reason) {
     const { rows } = await this.query(
@@ -535,7 +541,7 @@ export class PostgresStore {
       const { rows } = await tx.query(
         `SELECT id,purpose,policy_version,granted,granted_at
         FROM consent_records WHERE user_id=$1
-        AND purpose IN ('synthetic_onboarding','synthetic_matching')
+        AND purpose IN ('synthetic_onboarding','synthetic_matching','synthetic_discovery')
         ORDER BY event_order DESC LIMIT 100`,
         [userId],
       );

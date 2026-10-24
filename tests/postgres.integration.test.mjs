@@ -361,6 +361,7 @@ test(
       );
       await httpAuthJourney({
         admin,
+        store,
         user: persisted,
         otherUser: {
           id: secondRegistration.userId,
