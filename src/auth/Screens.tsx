@@ -421,8 +421,9 @@ export function PatientProfileForm() {
                 preferences
               </label>
               <p>
-                Matching is not enabled. This choice does not publish your
-                profile or grant a mentor role. Uncheck and save to withdraw.
+                This preference does not publish your profile or grant a mentor
+                role. Manage discovery cards and connections separately on the
+                Peer connections page.
               </p>
             </>
           )}
@@ -481,8 +482,8 @@ function ConsentHistory() {
       <h2 id="consent-history-title">Your consent history</h2>
       <p>
         Your latest 100 recorded choices, newest first. Earlier profile choices
-        were not backfilled. Matching remains unavailable; these records do not
-        share your profile.
+        were not backfilled. These records do not publish your private
+        onboarding profile.
       </p>
       {error ? (
         <div role="alert">
@@ -508,7 +509,9 @@ function ConsentHistory() {
               <strong>
                 {event.purpose === "synthetic_matching"
                   ? "Matching preference"
-                  : "Private onboarding"}
+                  : event.purpose === "synthetic_discovery"
+                    ? "Discovery sharing"
+                    : "Private onboarding"}
                 : {event.granted ? "Granted" : "Not granted / withdrawn"}
               </strong>
               <p>

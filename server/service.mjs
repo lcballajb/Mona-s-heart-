@@ -1,3 +1,9 @@
+import {
+  survivorCardInput,
+  peerRequestInput,
+  peerId,
+  peerError,
+} from "./peer-validation.mjs";
 import { validateOnboarding } from "./onboarding.mjs";
 import {
   hashPassword,
@@ -258,6 +264,20 @@ export class MonaService {
       locale,
     });
     return this.ownProfile(actor);
+  }
+  async peers(actor, op, input) {
+    let value;
+    if (op === "card") value = survivorCardInput(input);
+    else if (op === "request") value = peerRequestInput(input);
+    else if (op === "respond") {
+      const v = objectInput(input, ["requestId", "action"]);
+      if (!["accepted", "declined", "withdrawn"].includes(v.action))
+        throw peerError(400);
+      value = { requestId: peerId(v.requestId), action: v.action };
+    } else if (op === "block")
+      value = { targetId: peerId(objectInput(input, ["targetId"]).targetId) };
+    else if (op !== "state") throw peerError();
+    return this.store.peerOperation(actor.id, op, value);
   }
   async consentHistory(actor) {
     return this.store.listOwnConsentHistory(actor.id);

@@ -138,11 +138,10 @@ const server = http.createServer(async (request, response) => {
         },
       );
     }
-    const journeyRoute = [
-      "/v1/auth/me",
-      "/v1/profile",
-      "/v1/consent-history",
-    ].includes(path);
+    const journeyRoute =
+      ["/v1/auth/me", "/v1/profile", "/v1/consent-history"].includes(path) ||
+      path === "/v1/peers" ||
+      path.startsWith("/v1/peers/");
     if (journeyRoute && !config.syntheticPatientJourney)
       return reply(response, 503, {
         error: "Synthetic patient journey is disabled",
@@ -174,6 +173,24 @@ const server = http.createServer(async (request, response) => {
       !(await store.validateCsrf(session, request.headers["x-csrf-token"]))
     )
       return reply(response, 403, { error: "CSRF validation failed" });
+    if (request.method === "GET" && path === "/v1/peers")
+      return reply(response, 200, await service.peers(actor, "state"));
+    const peerRoutes = {
+      "/v1/peers/card": "card",
+      "/v1/peers/requests": "request",
+      "/v1/peers/respond": "respond",
+      "/v1/peers/block": "block",
+    };
+    if (request.method === "POST" && peerRoutes[path])
+      return reply(
+        response,
+        200,
+        await service.peers(
+          actor,
+          peerRoutes[path],
+          await readJsonBody(request),
+        ),
+      );
     if (request.method === "GET" && path === "/v1/consent-history")
       return reply(response, 200, {
         events: await service.consentHistory(actor),
