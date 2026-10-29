@@ -3,7 +3,12 @@ import { readFile, readdir } from "node:fs/promises";
 import { dirname, extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const EXCLUDED_DIRECTORIES = new Set([".git", "dist", "node_modules"]);
+const EXCLUDED_DIRECTORIES = new Set([
+  ".git",
+  "dist",
+  "node_modules",
+  ".local-preview",
+]);
 const TEXT_EXTENSIONS = new Set([
   ".css",
   ".html",

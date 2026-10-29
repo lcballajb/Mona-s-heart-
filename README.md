@@ -21,6 +21,12 @@ Mona’s Heart is a healthcare support application developed and operated by Pro
 - PWA manifest, icon, privacy-safe offline fallback, and service worker that does not cache authenticated pages, health records, or documents.
 - CI, tests, type checking, ESLint, Prettier, Git hooks, issue templates, Dependabot, and ownership files.
 
+## Try it locally on your Mac
+
+For the free, synthetic-only PostgreSQL preview with prepared test accounts, follow
+the [Mac preview guide](docs/operations/LOCAL_MAC_PREVIEW.md). The launcher is
+available on `feat/local-synthetic-preview`; no public hosting is required.
+
 ## Development
 
 Requires Node.js 24 LTS (see `.nvmrc` and `package.json`). npm is the only
