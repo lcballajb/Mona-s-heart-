@@ -321,8 +321,10 @@ try {
   step = "authenticated routes never imply demo ownership";
   await page.goto(`${base}/messages`);
   await page
-    .getByRole("heading", { name: "This part of your journey is coming next" })
+    .getByText("No conversations are created automatically.", { exact: false })
     .waitFor();
+  assert.equal(await page.locator(".message-history").count(), 0);
+  assert.equal(await page.getByText("Hi Elena,", { exact: false }).count(), 0);
   step = "logout";
   await page.getByRole("button", { name: "Log out", exact: true }).click();
   await page.waitForURL("**/login");

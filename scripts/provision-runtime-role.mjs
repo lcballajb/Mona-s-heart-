@@ -47,6 +47,8 @@ try {
     `REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM ${identifier}`,
   );
   const readableTables = [
+    "peer_message_limits",
+    "peer_messages",
     "survivor_cards",
     "peer_match_requests",
     "account_tokens",
@@ -75,6 +77,7 @@ try {
   ].map(quoteIdentifier);
   const insertableTables = readableTables;
   const updatableTables = [
+    "peer_message_limits",
     "survivor_cards",
     "peer_match_requests",
     "account_tokens",

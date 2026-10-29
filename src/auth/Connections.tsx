@@ -72,8 +72,8 @@ export function Connections() {
       <p>
         Synthetic accounts only. Share only fictional information you want
         another account to see. These are peer connections, not verified
-        clinical or approved mentor relationships. Messaging is not connected
-        yet.
+        clinical or approved mentor relationships. Accepted connections can open
+        a private synthetic conversation.
       </p>
       <Link to="/onboarding">Edit your private onboarding profile</Link>
       {error && (
@@ -245,6 +245,11 @@ export function Connections() {
                       Decline request
                     </button>
                   </>
+                )}
+                {r.status === "accepted" && (
+                  <Link className="button" to={`/messages/${r.id}`}>
+                    Open conversation
+                  </Link>
                 )}
                 {["pending", "accepted"].includes(r.status) && (
                   <button

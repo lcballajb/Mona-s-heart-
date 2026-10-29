@@ -809,12 +809,23 @@ test(
         assert.equal(remaining.rows[0].count, 0, table);
       }
       const lifecycleAudit = await admin.query(
-        "SELECT event_type FROM audit_events WHERE subject_id=$1 AND event_type LIKE 'deletion_%' ORDER BY occurred_at",
+        "SELECT event_type,occurred_at FROM audit_events WHERE subject_id=$1 AND event_type LIKE 'deletion_%'",
         [actor.id],
       );
       assert.deepEqual(
-        lifecycleAudit.rows.map((row) => row.event_type),
-        ["deletion_request", "deletion_started", "deletion_completed"],
+        lifecycleAudit.rows.map((row) => row.event_type).sort(),
+        ["deletion_request", "deletion_started", "deletion_completed"].sort(),
+      );
+
+      // now() is transaction-stable: started/completed legitimately share a
+      // timestamp, so row order on occurred_at alone is not a chronology.
+      const auditTime = (event) =>
+        lifecycleAudit.rows
+          .find((row) => row.event_type === event)
+          .occurred_at.getTime();
+      assert.ok(auditTime("deletion_request") <= auditTime("deletion_started"));
+      assert.ok(
+        auditTime("deletion_started") <= auditTime("deletion_completed"),
       );
 
       const workerPrivileges = await store.query(

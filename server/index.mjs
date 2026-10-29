@@ -1,3 +1,5 @@
+import { messageInput, messageCursor } from "./message-security.mjs";
+import { peerId } from "./peer-validation.mjs";
 import http from "node:http";
 import { createStore } from "./store-factory.mjs";
 import { MonaService } from "./service.mjs";
@@ -144,6 +146,7 @@ const server = http.createServer(async (request, response) => {
     }
     const journeyRoute =
       ["/v1/auth/me", "/v1/profile", "/v1/consent-history"].includes(path) ||
+      path.startsWith("/v1/peer-messages/") ||
       path === "/v1/peers" ||
       path.startsWith("/v1/peers/");
     if (journeyRoute && !config.syntheticPatientJourney)
@@ -177,6 +180,36 @@ const server = http.createServer(async (request, response) => {
       !(await store.validateCsrf(session, request.headers["x-csrf-token"]))
     )
       return reply(response, 403, { error: "CSRF validation failed" });
+    if (path.startsWith("/v1/peer-messages/")) {
+      if (!config.messagingKey)
+        return reply(response, 503, {
+          error: "Synthetic messaging is disabled",
+        });
+      const connectionId = peerId(
+        path.slice("/v1/peer-messages/".length),
+      ).toLowerCase();
+      if (!["GET", "POST"].includes(request.method))
+        return reply(response, 405, { error: "Method not allowed" });
+      const input =
+        request.method === "POST"
+          ? messageInput(await readJsonBody(request))
+          : null;
+      const before = messageCursor(
+        new URL(request.url, "http://localhost").searchParams.get("before"),
+      );
+      return reply(
+        response,
+        200,
+        await store.messageOperation(
+          actor.id,
+          session.id,
+          connectionId,
+          input,
+          before,
+          config.messagingKey,
+        ),
+      );
+    }
     if (request.method === "GET" && path === "/v1/peers")
       return reply(response, 200, await service.peers(actor, "state"));
     const peerRoutes = {

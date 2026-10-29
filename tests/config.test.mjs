@@ -99,3 +99,20 @@ test("synthetic patient journey defaults off and rejects production startup", ()
     /Synthetic patient journey cannot be enabled in production/,
   );
 });
+
+test("synthetic messaging requires PostgreSQL, explicit journey opt-in and an external key", () => {
+  for (const env of [
+    { SYNTHETIC_MESSAGING_ENABLED: "true" },
+    {
+      SYNTHETIC_MESSAGING_ENABLED: "true",
+      SYNTHETIC_PATIENT_JOURNEY_ENABLED: "true",
+      DATABASE_ADAPTER: "memory",
+    },
+    {
+      SYNTHETIC_MESSAGING_ENABLED: "true",
+      SYNTHETIC_PATIENT_JOURNEY_ENABLED: "true",
+      DATABASE_ADAPTER: "postgres",
+    },
+  ])
+    assert.throws(() => loadApiConfig(env));
+});

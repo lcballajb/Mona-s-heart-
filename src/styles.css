@@ -1784,3 +1784,15 @@ button:disabled {
 .connections p {
   white-space: pre-wrap;
 }
+
+.message-history {
+  list-style: none;
+  padding: 0;
+}
+.conversation textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+.conversation time {
+  font-size: 0.85rem;
+}

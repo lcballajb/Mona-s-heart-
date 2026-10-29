@@ -189,7 +189,10 @@ test(
       status: "active",
     });
 
-    assert.equal(calls.filter(({ text }) => text === "BEGIN").length, 2);
+    assert.equal(
+      calls.filter(({ text }) => text.startsWith("BEGIN")).length,
+      2,
+    );
     assert.deepEqual(
       calls
         .filter(({ text }) =>

@@ -1,3 +1,4 @@
+import { messageKey } from "./message-security.mjs";
 const PLACEHOLDER = /replace_with|example\.invalid|development-only/i;
 
 function integer(name, value, { minimum, maximum }) {
@@ -135,10 +136,28 @@ export function loadApiConfig(env = process.env) {
       );
   }
 
+  let messagingKey = null;
+  if (env.SYNTHETIC_MESSAGING_ENABLED === "true") {
+    if (
+      environment === "production" ||
+      env.SYNTHETIC_PATIENT_JOURNEY_ENABLED !== "true" ||
+      env.DATABASE_ADAPTER !== "postgres"
+    )
+      errors.push(
+        "Synthetic messaging requires a non-production synthetic PostgreSQL journey",
+      );
+    try {
+      messagingKey = messageKey(env.MESSAGE_ENCRYPTION_KEY);
+    } catch (error) {
+      errors.push(error.message);
+    }
+  }
+
   if (errors.length)
     throw new Error(`Invalid API configuration:\n- ${errors.join("\n- ")}`);
 
   return Object.freeze({
+    messagingKey,
     environment,
     production: environment === "production",
     syntheticPatientJourney: env.SYNTHETIC_PATIENT_JOURNEY_ENABLED === "true",
