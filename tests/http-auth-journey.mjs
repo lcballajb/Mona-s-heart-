@@ -1,3 +1,5 @@
+import { httpMessageJourney } from "./http-message-journey.mjs";
+import { randomBytes } from "node:crypto";
 import { httpPeerJourney } from "./http-peer-journey.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -19,12 +21,15 @@ export async function httpAuthJourney({
   await once(reservation, "listening");
   const port = reservation.address().port;
   await new Promise((resolve) => reservation.close(resolve));
+  const messagingKey = randomBytes(32).toString("base64");
   const child = spawn(process.execPath, ["server/index.mjs"], {
     env: {
       ...process.env,
       API_HOST: "127.0.0.1",
       API_PORT: String(port),
       SYNTHETIC_PATIENT_JOURNEY_ENABLED: "true",
+      SYNTHETIC_MESSAGING_ENABLED: "true",
+      MESSAGE_ENCRYPTION_KEY: messagingKey,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -57,6 +62,7 @@ export async function httpAuthJourney({
     }
     assert.equal(ready, true, "Test API must become ready");
     await httpPeerJourney({ request, admin, store });
+    await httpMessageJourney({ request, admin, store, key: messagingKey });
     assert.equal((await request("/v1/auth/sessions")).status, 401);
     assert.equal((await request("/v1/profile")).status, 401);
     assert.equal((await request("/v1/consent-history")).status, 401);

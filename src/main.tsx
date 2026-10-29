@@ -1,3 +1,4 @@
+import { Conversation as PrivateConversation } from "./auth/Conversation";
 import { Connections } from "./auth/Connections";
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -582,8 +583,9 @@ function Dashboard() {
           </Link>
           <p>
             Explore explicitly shared survivor cards and manage your connection
-            requests. Messaging and support groups are not connected yet. Your
-            private profile stays private.
+            requests. Accepted connections can exchange private synthetic
+            messages. Support groups are not connected yet. Your private profile
+            stays private.
           </p>
         </section>
       </AppShell>
@@ -804,8 +806,8 @@ function Matches() {
   );
 }
 function Profile() {
-  const { id } = useParams();
-  const m = mentors.find((x) => x.id === id) || mentors[0];
+  const { connectionId } = useParams();
+  const m = mentors.find((x) => x.id === connectionId) || mentors[0];
   return (
     <AppShell title="Mentor profile">
       <Link to="/matches">← Back to matches</Link>
@@ -912,8 +914,8 @@ function Messages() {
   );
 }
 function Conversation() {
-  const { id } = useParams();
-  const m = mentors.find((x) => x.id === id) || mentors[0];
+  const { connectionId } = useParams();
+  const m = mentors.find((x) => x.id === connectionId) || mentors[0];
   const [messages, setMessages] = useState([
     "Hi Elena, I’m glad you reached out. What feels most important to talk through?",
     "Thank you, Maya. I’m nervous about my follow-up visit and want to prepare good questions.",
@@ -2122,6 +2124,33 @@ function DemoFeature({ children }: { children: React.ReactNode }) {
     </AppShell>
   );
 }
+function AccountMessages() {
+  const { state } = useSession();
+  return state.status === "demo" ? (
+    <Messages />
+  ) : (
+    <AppShell title="Messages">
+      <p>
+        Open an accepted connection to see its conversation. No conversations
+        are created automatically.
+      </p>
+      <Link className="button" to="/matches">
+        Manage peer connections
+      </Link>
+    </AppShell>
+  );
+}
+function AccountConversation() {
+  const { state } = useSession();
+  const { connectionId } = useParams();
+  return state.status === "demo" ? (
+    <Conversation />
+  ) : (
+    <AppShell title="Conversation">
+      <PrivateConversation key={`${state.user?.id}:${connectionId}`} />
+    </AppShell>
+  );
+}
 function PeerConnectionsPage() {
   const { state } = useSession();
   return state.status === "demo" ? (
@@ -2192,19 +2221,15 @@ function App() {
         path="/messages"
         element={
           <Protected>
-            <DemoFeature>
-              <Messages />
-            </DemoFeature>
+            <AccountMessages />
           </Protected>
         }
       />
       <Route
-        path="/messages/:id"
+        path="/messages/:connectionId"
         element={
           <Protected>
-            <DemoFeature>
-              <Conversation />
-            </DemoFeature>
+            <AccountConversation />
           </Protected>
         }
       />

@@ -1,3 +1,4 @@
+import { postgresMessages } from "./postgres-messages.mjs";
 import { postgresPeers } from "./postgres-peers.mjs";
 import { onboardingConsentEvents } from "./onboarding.mjs";
 import { randomUUID } from "node:crypto";
@@ -33,6 +34,9 @@ export class PostgresStore {
     this.sessionPepper = sessionPepper;
     this.rlsContext = rlsContext;
   }
+  messageOperation(...args) {
+    return postgresMessages(this, ...args);
+  }
   peerOperation(id, op, input) {
     return postgresPeers(this, id, op, input);
   }
@@ -62,7 +66,8 @@ export class PostgresStore {
     const client = await this.pool.connect();
     databaseMetrics.connectionWaitMs += performance.now() - started;
     try {
-      await client.query("BEGIN");
+      // Authorization must take a fresh snapshot after waiting on account locks.
+      await client.query("BEGIN ISOLATION LEVEL READ COMMITTED");
       if (context.userId)
         await client.query("SELECT set_config('app.user_id', $1, true)", [
           context.userId,

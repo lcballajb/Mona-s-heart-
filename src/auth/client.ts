@@ -1,3 +1,13 @@
+export type MessagePageDTO = {
+  messages: {
+    id: string;
+    senderId: string;
+    clientId: string;
+    body: string;
+    sentAt: string;
+  }[];
+  before: string | null;
+};
 export type SurvivorCardDTO = {
   userId: string;
   alias: string;
@@ -165,6 +175,18 @@ export class PatientClient {
       "POST",
       { token, password },
       true,
+    );
+  }
+  messages(connectionId: string, before?: string) {
+    return this.request<MessagePageDTO>(
+      `/peer-messages/${encodeURIComponent(connectionId)}${before ? `?before=${encodeURIComponent(before)}` : ""}`,
+    );
+  }
+  sendMessage(connectionId: string, input: { body: string; clientId: string }) {
+    return this.request<{ id: string }>(
+      `/peer-messages/${encodeURIComponent(connectionId)}`,
+      "POST",
+      input,
     );
   }
   peers() {

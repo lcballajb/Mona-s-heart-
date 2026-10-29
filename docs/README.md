@@ -296,3 +296,5 @@ This inventory is the navigation reference used by the orphan/link check. Inclus
 - [Phase 3B private consent history](engineering/PHASE_3B_CONSENT_HISTORY.md)
 
 - [Phase 3B survivor discovery and matching](engineering/PHASE_3B_PEER_MATCHING.md)
+
+- [Phase 3C synthetic connection messaging](engineering/PHASE_3C_MESSAGING.md)
