@@ -43,6 +43,7 @@ test("new session/profile HTTP routes stay disabled without explicit synthetic o
     }
     assert.equal(ready, true);
     for (const [path, method] of [
+      ["/v1/auth/register", "POST"],
       ["/v1/auth/me", "GET"],
       ["/v1/profile", "GET"],
       ["/v1/consent-history", "GET"],

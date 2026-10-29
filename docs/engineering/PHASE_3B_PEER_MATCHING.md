@@ -61,8 +61,8 @@ concurrency, withdrawal-versus-acceptance concurrency, blocking and actual delet
 cleanup. Chromium creates three separate verified accounts, publishes, requests,
 accepts, withdraws, republishes and blocks through the UI, then checks mobile width.
 Existing authentication, consent, security and three-role onboarding tests remain.
-Final CI on the PR is the authoritative database/browser result. Local database
-skips are not counted as verification.
+Database-dependent checks must run against a disposable PostgreSQL database;
+skips are not counted as verification. See the reconciliation below for fresh evidence.
 
 ## Limits and next milestone
 
@@ -76,3 +76,30 @@ After review and explicit merge approval, connect member-only messaging for acti
 accepted connections. Check current eligibility, consent withdrawal and blocks on
 every operation, implement message-storage protections, and prove the two-account
 send/read/deny journey before enabling it.
+
+## PR #153 reconciliation — 2026-10-29
+
+Reviewed the complete 25-file diff against main `3568bdb`; the original PR head
+was `8f4b083`. GitHub CI run 40107641691 passed both verify and dependency-review
+on that head. There were no submitted reviews; CI success is not human approval.
+
+Confirmed publication requires explicit versioned consent and records it atomically;
+private onboarding is not published. PostgreSQL enforces participant isolation,
+current active/verified/public-role synthetic eligibility, recipient acceptance,
+terminal withdrawal, bidirectional blocking, forced RLS, and deletion cascades.
+The HTTP/database and browser journeys exercise these boundaries using synthetic
+accounts and the restricted runtime role.
+
+Two confirmed gaps were fixed: registration was reachable with synthetic mode off
+(now returns 503), and the memory peer adapter omitted the public-role eligibility
+check enforced by PostgreSQL. Focused HTTP and adapter regressions cover both.
+Production still rejects synthetic mode; public registration is disabled.
+
+Fresh local verification used Node 24.19.0, PostgreSQL 16, a non-owner runtime
+role, and Chromium: `npm ci`, typecheck, lint, format check, repository audit,
+78/78 tests (zero skips), mandatory PostgreSQL/HTTP integration, build, all three
+onboarding browser journeys, and the peer browser journey passed. The peer fixture
+now uses a unique alias so repeat runs do not collide with preserved synthetic
+cards. A prior overlapping browser invocation and the pre-fix duplicate-alias
+selector failure were harness failures, corrected before this report. The build
+retains the existing bundle-size and React Router directive warnings.

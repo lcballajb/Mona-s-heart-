@@ -7,6 +7,7 @@ const active = (s, id, role) => {
     u.verifiedAt &&
     !u.deletedAt &&
     u.email.endsWith(".test") &&
+    u.roles.some((r) => ["patient", "survivor", "caregiver"].includes(r)) &&
     (!role || u.roles.includes(role))
   );
 };

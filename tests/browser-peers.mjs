@@ -95,6 +95,7 @@ try {
       : {}),
   });
   const password = "synthetic matching browser password";
+  const survivorAlias = `Shared Synthetic Survivor ${Date.now()}`;
   async function account(role) {
     const email = `peer-browser-${role}-${Date.now()}@example.test`;
     const context = await browser.newContext({
@@ -152,7 +153,7 @@ try {
   async function publish() {
     await s.page
       .getByLabel("Shared display name", { exact: true })
-      .fill("Shared Synthetic Survivor");
+      .fill(survivorAlias);
     await s.page
       .getByLabel("Introduction (shared)")
       .fill("Explicit shared introduction");
@@ -171,7 +172,7 @@ try {
     await p.page.reload();
     const card = p.page.locator("article").filter({
       has: p.page.getByRole("heading", {
-        name: "Shared Synthetic Survivor",
+        name: survivorAlias,
         exact: true,
       }),
     });
@@ -224,7 +225,7 @@ try {
   await p.page.getByText("unavailable", { exact: true }).waitFor();
   assert.equal(
     await p.page
-      .getByRole("heading", { name: "Shared Synthetic Survivor", exact: true })
+      .getByRole("heading", { name: survivorAlias, exact: true })
       .count(),
     0,
   );
@@ -245,7 +246,7 @@ try {
     .waitFor();
   assert.equal(
     await p.page
-      .getByRole("heading", { name: "Shared Synthetic Survivor", exact: true })
+      .getByRole("heading", { name: survivorAlias, exact: true })
       .count(),
     0,
   );

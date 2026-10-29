@@ -133,3 +133,13 @@ test("withdrawal and blocks invalidate pending and accepted matches in both dire
   store.users.get(s.id).status = "deactivated";
   await assert.rejects(service.peers(s, "state"), (e) => e.statusCode === 403);
 });
+
+test("accounts without a current public peer role cannot discover connections", async () => {
+  const {
+    store,
+    service,
+    users: [p],
+  } = await setup();
+  store.users.get(p.id).roles = ["administrator"];
+  await assert.rejects(service.peers(p, "state"), (e) => e.statusCode === 403);
+});

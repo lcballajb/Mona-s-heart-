@@ -95,6 +95,10 @@ const server = http.createServer(async (request, response) => {
       return reply(response, 200, result);
     }
     if (request.method === "POST" && path === "/v1/auth/register") {
+      if (!config.syntheticPatientJourney)
+        return reply(response, 503, {
+          error: "Public registration is disabled",
+        });
       const input = await readJsonBody(request);
       if (
         config.syntheticPatientJourney &&
