@@ -103,3 +103,9 @@ now uses a unique alias so repeat runs do not collide with preserved synthetic
 cards. A prior overlapping browser invocation and the pre-fix duplicate-alias
 selector failure were harness failures, corrected before this report. The build
 retains the existing bundle-size and React Router directive warnings.
+
+Current-head CI run 40957259398 passed dependency review and all code/database
+checks through build, then failed installing Chromium because ubuntu-latest now
+resolves to Ubuntu 26.04, unsupported by the pinned Playwright headless shell.
+CI is pinned to Ubuntu 24.04 to retain a supported, reproducible browser runner.
+Both serial repeat peer journeys and backup/restore dry runs passed locally.
