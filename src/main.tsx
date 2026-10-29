@@ -1,3 +1,4 @@
+import { Connections } from "./auth/Connections";
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -568,7 +569,7 @@ function Dashboard() {
                   <dt>Matching consent</dt>
                   <dd>
                     {state.profile.onboarding.matchingConsent
-                      ? "Recorded; matching is not enabled"
+                      ? "Recorded; discovery sharing requires separate consent"
                       : "Not granted"}
                   </dd>
                 </>
@@ -576,10 +577,13 @@ function Dashboard() {
             </dl>
           )}
           <h2>Your next connection</h2>
+          <Link className="button" to="/matches">
+            Manage peer connections
+          </Link>
           <p>
-            Survivor discovery, matching, messaging and support groups are not
-            connected to this account yet. Your private profile will not be
-            shared through the demonstration screens.
+            Explore explicitly shared survivor cards and manage your connection
+            requests. Messaging and support groups are not connected yet. Your
+            private profile stays private.
           </p>
         </section>
       </AppShell>
@@ -2118,6 +2122,16 @@ function DemoFeature({ children }: { children: React.ReactNode }) {
     </AppShell>
   );
 }
+function PeerConnectionsPage() {
+  const { state } = useSession();
+  return state.status === "demo" ? (
+    <Matches />
+  ) : (
+    <AppShell title="Peer connections">
+      <Connections />
+    </AppShell>
+  );
+}
 function App() {
   return (
     <Routes>
@@ -2160,9 +2174,7 @@ function App() {
         path="/matches"
         element={
           <Protected>
-            <DemoFeature>
-              <Matches />
-            </DemoFeature>
+            <PeerConnectionsPage />
           </Protected>
         }
       />

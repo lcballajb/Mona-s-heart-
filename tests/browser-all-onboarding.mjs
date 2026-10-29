@@ -6,3 +6,9 @@ for (const role of ["patient", "survivor", "caregiver"]) {
   });
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
+
+const peers = spawnSync(process.execPath, ["tests/browser-peers.mjs"], {
+  env: process.env,
+  stdio: "inherit",
+});
+if (peers.status !== 0) process.exit(peers.status ?? 1);

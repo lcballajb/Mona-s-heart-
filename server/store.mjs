@@ -1,3 +1,4 @@
+import { memoryPeers } from "./memory-peers.mjs";
 import { onboardingConsentEvents } from "./onboarding.mjs";
 import { randomUUID } from "node:crypto";
 import { tokenDigest, sessionCsrfToken } from "./security.mjs";
@@ -11,6 +12,8 @@ export class MemoryStore {
     this.audits = [];
     this.consents = [];
     this.profiles = new Map();
+    this.survivorCards = new Map();
+    this.peerRequests = [];
     this.messages = [];
     this.documents = [];
     this.memberships = [];
@@ -29,6 +32,9 @@ export class MemoryStore {
     this.moderationActions = [];
     this.contentReviews = [];
     this.evidenceSources = [];
+  }
+  peerOperation(id, op, input) {
+    return memoryPeers(this, id, op, input);
   }
   now() {
     return this.clock().toISOString();
@@ -428,6 +434,10 @@ export class MemoryStore {
     for (const report of this.reports)
       if (report.subjectId === userId) report.subjectId = null;
     this.profiles.delete(userId);
+    this.survivorCards.delete(userId);
+    this.peerRequests = this.peerRequests.filter(
+      (r) => r.requesterId !== userId && r.survivorId !== userId,
+    );
     this.consents = this.consents.filter((row) => row.userId !== userId);
     this.memberships = this.memberships.filter((row) => row.userId !== userId);
     this.messages = this.messages.filter((row) => row.senderId !== userId);
@@ -475,7 +485,11 @@ export class MemoryStore {
       .filter(
         (row) =>
           row.userId === userId &&
-          ["synthetic_onboarding", "synthetic_matching"].includes(row.purpose),
+          [
+            "synthetic_onboarding",
+            "synthetic_matching",
+            "synthetic_discovery",
+          ].includes(row.purpose),
       )
       .slice(-100)
       .reverse()

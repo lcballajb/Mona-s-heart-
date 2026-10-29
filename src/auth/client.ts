@@ -1,6 +1,28 @@
+export type SurvivorCardDTO = {
+  userId: string;
+  alias: string;
+  introduction: string;
+  availability: string;
+  published: boolean;
+  version: string;
+};
+export type PeersDTO = {
+  card: SurvivorCardDTO | null;
+  cards: SurvivorCardDTO[];
+  requests: {
+    id: string;
+    direction: "incoming" | "outgoing";
+    counterpartId: string | null;
+    alias: string;
+    status: "pending" | "accepted" | "unavailable";
+  }[];
+};
 export type ConsentEventDTO = {
   id: string;
-  purpose: "synthetic_onboarding" | "synthetic_matching";
+  purpose:
+    | "synthetic_onboarding"
+    | "synthetic_matching"
+    | "synthetic_discovery";
   version: string;
   granted: boolean;
   recordedAt: string;
@@ -144,6 +166,14 @@ export class PatientClient {
       { token, password },
       true,
     );
+  }
+  peers() {
+    return this.request<PeersDTO>("/peers");
+  }
+  peerAction(operation: string, input: unknown) {
+    if (!["card", "requests", "respond", "block"].includes(operation))
+      throw new Error("Unknown connection action");
+    return this.request(`/peers/${operation}`, "POST", input);
   }
   consentHistory() {
     return this.request<{ events: ConsentEventDTO[] }>("/consent-history");

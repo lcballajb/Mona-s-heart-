@@ -1,3 +1,4 @@
+import { httpPeerJourney } from "./http-peer-journey.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -6,7 +7,13 @@ import { setTimeout as delay } from "node:timers/promises";
 
 // Runs against the real API and disposable PostgreSQL used by the integration
 // suite. No test-only HTTP endpoint exposes verification or recovery tokens.
-export async function httpAuthJourney({ admin, user, otherUser, password }) {
+export async function httpAuthJourney({
+  admin,
+  store,
+  user,
+  otherUser,
+  password,
+}) {
   const reservation = net.createServer();
   reservation.listen(0, "127.0.0.1");
   await once(reservation, "listening");
@@ -49,6 +56,7 @@ export async function httpAuthJourney({ admin, user, otherUser, password }) {
       await delay(50);
     }
     assert.equal(ready, true, "Test API must become ready");
+    await httpPeerJourney({ request, admin, store });
     assert.equal((await request("/v1/auth/sessions")).status, 401);
     assert.equal((await request("/v1/profile")).status, 401);
     assert.equal((await request("/v1/consent-history")).status, 401);

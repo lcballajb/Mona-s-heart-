@@ -1763,3 +1763,24 @@ button:disabled {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
+
+.connections .full {
+  grid-column: 1 / -1;
+}
+.connections .peer-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 20px 0;
+  overflow-wrap: anywhere;
+}
+.connections input[type="checkbox"] {
+  width: auto;
+}
+.connections .button {
+  margin: 6px 6px 6px 0;
+}
+.connections p {
+  white-space: pre-wrap;
+}
