@@ -25,7 +25,9 @@ promise. Subsequent starts normally take less time.
    Colima supplies a local Docker engine without Docker Desktop or a hosting
    subscription. Keep Colima running while using the app. Node 24 is required.
 
-3. Download and unzip `Mona-Heart-Local.zip` into Downloads. Then run:
+3. Download the [local preview ZIP](https://github.com/lcballajb/Mona-s-heart-/archive/refs/heads/feat/local-synthetic-preview.zip) while signed into GitHub.
+   Unzip it, rename the extracted folder **Mona-Heart-Local**, and move that folder
+   into Downloads. Then run:
 
    ```sh
    cd ~/Downloads/Mona-Heart-Local
