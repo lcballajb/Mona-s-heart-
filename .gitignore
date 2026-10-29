@@ -11,3 +11,6 @@ coverage/
 
 # Private synthetic development delivery must never be committed.
 .dev-outbox/
+
+# Local-only preview credentials, encryption key and test delivery.
+.local-preview/

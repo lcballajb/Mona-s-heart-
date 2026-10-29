@@ -18,7 +18,8 @@
     "start:api": "node server/index.mjs",
     "start:worker": "node server/worker-entry.mjs",
     "prepare": "node scripts/prepare.mjs",
-    "test:browser": "node tests/browser-all-onboarding.mjs"
+    "test:browser": "node tests/browser-all-onboarding.mjs",
+    "preview:local": "node scripts/local-preview.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "4.3.4",

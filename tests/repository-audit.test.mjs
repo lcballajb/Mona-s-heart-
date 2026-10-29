@@ -43,3 +43,14 @@ test("repository audit reports stabilization regressions together", async (t) =>
     "orphan-document",
   ]);
 });
+
+test("local preview private state is excluded from repository reporting", async (t) => {
+  const root = await fixture({
+    "README.md": "# Local app\n",
+    ".local-preview/TEST-ACCOUNTS.txt": "synthetic private fixture\n",
+    ".local-preview/notes.md": "[private](missing-file.md)\n<<<<<<< PRIVATE\n",
+  });
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const result = await auditRepository(root);
+  assert.deepEqual(result.findings, []);
+});
